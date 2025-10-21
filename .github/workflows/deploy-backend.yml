@@ -1,0 +1,42 @@
+# Sample GitHub Actions workflow for deploying Express backend (Docker)
+name: Deploy Backend
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./backend
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/ai-real-estate-backend:latest
+
+      - name: Deploy to server (example: SSH)
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/ai-real-estate-backend:latest
+            docker stop ai-real-estate-backend || true
+            docker rm ai-real-estate-backend || true
+            docker run -d --name ai-real-estate-backend -p 3001:3001 --env-file /path/to/.env ${{ secrets.DOCKERHUB_USERNAME }}/ai-real-estate-backend:latest
