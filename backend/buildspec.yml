@@ -1,0 +1,16 @@
+version: 0.2
+phases:
+  install:
+    runtime-versions:
+      nodejs: 18
+    commands:
+      - npm install
+  build:
+    commands:
+      - echo "Build step (optional for Node.js)"
+  post_build:
+    commands:
+      - echo "Post-build step"
+artifacts:
+  files:
+    - '**/*'
