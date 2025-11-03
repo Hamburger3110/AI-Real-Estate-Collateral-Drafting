@@ -1,5 +1,5 @@
 const express = require('express');
-const { sendTextractComplete } = require('./events');
+const { sendTextractComplete } = require('../events');
 const router = express.Router();
 
 // Webhook endpoint for AWS Lambda to notify Textract completion

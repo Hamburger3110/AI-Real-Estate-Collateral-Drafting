@@ -6,7 +6,105 @@ const pool = new Pool({
   database: process.env.PGDATABASE || 'your_pg_db',
   password: process.env.PGPASSWORD || 'your_pg_password',
   port: process.env.PGPORT || 5432,
+  ssl: process.env.PGHOST && process.env.PGHOST.includes('rds.amazonaws.com') ? {
+    rejectUnauthorized: false
+  } : false,
+  connectionTimeoutMillis: 10000,
+  idleTimeoutMillis: 30000,
 });
+
+// DATABASE MIGRATIONS
+async function runMigrations() {
+  const client = await pool.connect();
+  try {
+    // Create schema version table first
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS schema_version (
+        version INTEGER PRIMARY KEY,
+        applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Check current schema version
+    const versionResult = await client.query('SELECT COALESCE(MAX(version), 0) as current_version FROM schema_version');
+    const currentVersion = parseInt(versionResult.rows[0].current_version) || 0;
+    
+    console.log(`📋 Current database schema version: ${currentVersion}`);
+
+    // Migration 3: Add approval workflow columns to existing contracts table
+    if (currentVersion < 3) {
+      console.log('📦 Applying migration 3 - Adding approval workflow columns...');
+      
+      try {
+        // Add new columns to existing contracts table if they don't exist
+        await client.query(`
+          DO $$ 
+          BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='contracts' AND column_name='current_approval_stage') THEN
+              ALTER TABLE contracts ADD COLUMN current_approval_stage VARCHAR(50) DEFAULT 'document_review';
+            END IF;
+            
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='contracts' AND column_name='risk_score') THEN
+              ALTER TABLE contracts ADD COLUMN risk_score DECIMAL(5,2) DEFAULT 0;
+            END IF;
+            
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='contracts' AND column_name='priority') THEN
+              ALTER TABLE contracts ADD COLUMN priority VARCHAR(20) DEFAULT 'medium';
+            END IF;
+          END $$;
+        `);
+        
+        // Update existing contracts to use new schema
+        await client.query(`
+          UPDATE contracts SET 
+            status = CASE
+              WHEN status = 'started' THEN 'draft'
+              WHEN status = 'processing' THEN 'draft'
+              WHEN status = 'pending_documents' THEN 'draft'
+              ELSE status
+            END,
+            current_approval_stage = CASE 
+              WHEN status = 'approved' THEN 'completed'
+              WHEN status = 'rejected' THEN 'rejected'
+              WHEN current_approval_stage IS NULL OR current_approval_stage = '' THEN 'document_review'
+              ELSE current_approval_stage
+            END,
+            priority = COALESCE(priority, 'medium');
+        `);
+        
+        // Create contract approvals table
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS contract_approvals (
+            approval_id SERIAL PRIMARY KEY,
+            contract_id INT REFERENCES contracts(contract_id),
+            stage VARCHAR(50) NOT NULL,
+            approver_id INT REFERENCES users(user_id),
+            status VARCHAR(20) NOT NULL,
+            comments TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(contract_id, stage)
+          );
+        `);
+        
+        await client.query('INSERT INTO schema_version (version) VALUES (3) ON CONFLICT (version) DO NOTHING');
+        console.log('✅ Migration 3 completed successfully');
+        
+      } catch (error) {
+        console.error('❌ Error in migration 3:', error.message);
+        throw error;
+      }
+    }
+
+    console.log('✅ All migrations completed');
+    
+  } catch (error) {
+    console.error('❌ Migration error:', error);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
 
 async function createTables() {
   const client = await pool.connect();
@@ -54,7 +152,20 @@ async function createTables() {
         generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         approved_by INT REFERENCES users(user_id),
         approved_at TIMESTAMP,
-        status VARCHAR(50) DEFAULT 'started'
+        status VARCHAR(50) DEFAULT 'draft',
+        current_approval_stage VARCHAR(50) DEFAULT 'document_review',
+        risk_score DECIMAL(5,2) DEFAULT 0,
+        priority VARCHAR(20) DEFAULT 'medium'
+      );
+      CREATE TABLE IF NOT EXISTS contract_approvals (
+        approval_id SERIAL PRIMARY KEY,
+        contract_id INT REFERENCES contracts(contract_id),
+        stage VARCHAR(50) NOT NULL,
+        approver_id INT REFERENCES users(user_id),
+        status VARCHAR(20) NOT NULL,
+        comments TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
       CREATE TABLE IF NOT EXISTS integrations (
         integration_id SERIAL PRIMARY KEY,
@@ -162,9 +273,100 @@ async function createActivityLog(data) {
   }
 }
 
+// Seed demo users for authentication system
+async function seedDemoUsers() {
+  const client = await pool.connect();
+  try {
+    // Check if users already exist
+    const existingUsers = await client.query('SELECT COUNT(*) FROM users');
+    if (parseInt(existingUsers.rows[0].count) > 0) {
+      console.log('Demo users already exist, skipping seed.');
+      return;
+    }
+
+    // Insert demo users that match our authentication system
+    const demoUsers = [
+      {
+        full_name: 'System Administrator',
+        email: 'admin@vpbank.com',
+        role: 'ADMIN',
+        cognito_id: 'admin-demo-1'
+      },
+      {
+        full_name: 'Sarah Johnson',
+        email: 'credit.officer@vpbank.com',
+        role: 'CREDIT_OFFICER',
+        cognito_id: 'credit-demo-2'
+      },
+      {
+        full_name: 'Lisa Chen',
+        email: 'legal.officer@vpbank.com',
+        role: 'LEGAL_OFFICER',
+        cognito_id: 'legal-demo-3'
+      },
+      {
+        full_name: 'Mike Wilson',
+        email: 'manager@vpbank.com',
+        role: 'MANAGER',
+        cognito_id: 'manager-demo-4'
+      }
+    ];
+
+    for (const user of demoUsers) {
+      await client.query(
+        'INSERT INTO users (full_name, email, role, cognito_id) VALUES ($1, $2, $3, $4)',
+        [user.full_name, user.email, user.role, user.cognito_id]
+      );
+    }
+
+    console.log('✅ Demo users seeded successfully.');
+  } catch (error) {
+    console.error('❌ Error seeding demo users:', error);
+  } finally {
+    client.release();
+  }
+}
+
+// Test database connection
+async function testConnection() {
+  try {
+    console.log('🔗 Attempting to connect to:', process.env.PGHOST);
+    console.log('📧 Using user:', process.env.PGUSER);
+    console.log('🗄️ Database:', process.env.PGDATABASE);
+    
+    const client = await pool.connect();
+    const result = await client.query('SELECT NOW(), version()');
+    client.release();
+    
+    console.log('✅ Database connection successful!');
+    console.log('⏰ Server time:', result.rows[0].now);
+    console.log('🗃️ PostgreSQL version:', result.rows[0].version.split(' ')[0]);
+    return true;
+  } catch (error) {
+    console.error('❌ Database connection failed:');
+    console.error('   Error code:', error.code);
+    console.error('   Error message:', error.message);
+    
+    if (error.code === 'ENOTFOUND') {
+      console.error('   ➤ DNS resolution failed. Check your RDS endpoint.');
+    } else if (error.code === 'ECONNREFUSED') {
+      console.error('   ➤ Connection refused. Check security groups and port 5432.');
+    } else if (error.code === '28P01') {
+      console.error('   ➤ Authentication failed. Check username/password.');
+    } else if (error.code === '3D000') {
+      console.error('   ➤ Database does not exist. Check database name.');
+    }
+    
+    return false;
+  }
+}
+
 module.exports = {
   pool,
   createTables,
+  runMigrations,
+  seedDemoUsers,
+  testConnection,
   createUser,
   createDocument,
   createExtractedField,

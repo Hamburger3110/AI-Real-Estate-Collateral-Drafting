@@ -1,0 +1,43 @@
+
+> backend@1.0.0 start
+> node index.js
+
+[dotenv@17.2.3] injecting env (10) from .env -- tip: 🛠️  run anywhere with `dotenvx run -- yourcommand`
+🔄 Initializing database connection...
+🔗 Attempting to connect to: ai-collateral.cp4kyq4yeu8e.us-east-2.rds.amazonaws.com
+📧 Using user: postgres
+🗄️ Database: hackathon
+Server is running on port 3001
+(node:33307) NOTE: The AWS SDK for JavaScript (v2) is in maintenance mode.
+ SDK releases are limited to address critical bug fixes and security issues only.
+
+Please migrate your code to use AWS SDK for JavaScript (v3).
+For more information, check the blog post at https://a.co/cUPnyil
+(Use `node --trace-warnings ...` to show where the warning was created)
+✅ Database connection successful!
+⏰ Server time: 2025-11-03T03:25:01.007Z
+🗃️ PostgreSQL version: PostgreSQL
+✅ Database tables created/verified successfully.
+Demo users already exist, skipping seed.
+📤 Uploading test-document.txt to S3...
+❌ Upload error: NoSuchBucket: The specified bucket does not exist
+    at Request.extractError (/Users/cuongnm/projects/persona/AI-Real-Estate-Collateral-Drafting/backend/node_modules/aws-sdk/lib/services/s3.js:757:35)
+    at Request.callListeners (/Users/cuongnm/projects/persona/AI-Real-Estate-Collateral-Drafting/backend/node_modules/aws-sdk/lib/sequential_executor.js:106:20)
+    at Request.emit (/Users/cuongnm/projects/persona/AI-Real-Estate-Collateral-Drafting/backend/node_modules/aws-sdk/lib/sequential_executor.js:78:10)
+    at Request.emit (/Users/cuongnm/projects/persona/AI-Real-Estate-Collateral-Drafting/backend/node_modules/aws-sdk/lib/request.js:686:14)
+    at Request.transition (/Users/cuongnm/projects/persona/AI-Real-Estate-Collateral-Drafting/backend/node_modules/aws-sdk/lib/request.js:22:10)
+    at AcceptorStateMachine.runTo (/Users/cuongnm/projects/persona/AI-Real-Estate-Collateral-Drafting/backend/node_modules/aws-sdk/lib/state_machine.js:14:12)
+    at /Users/cuongnm/projects/persona/AI-Real-Estate-Collateral-Drafting/backend/node_modules/aws-sdk/lib/state_machine.js:26:10
+    at Request.<anonymous> (/Users/cuongnm/projects/persona/AI-Real-Estate-Collateral-Drafting/backend/node_modules/aws-sdk/lib/request.js:38:9)
+    at Request.<anonymous> (/Users/cuongnm/projects/persona/AI-Real-Estate-Collateral-Drafting/backend/node_modules/aws-sdk/lib/request.js:688:12)
+    at Request.callListeners (/Users/cuongnm/projects/persona/AI-Real-Estate-Collateral-Drafting/backend/node_modules/aws-sdk/lib/sequential_executor.js:116:18) {
+  code: 'NoSuchBucket',
+  region: null,
+  time: 2025-11-03T03:26:06.055Z,
+  requestId: '9MM011DWCQVT2D5Y',
+  extendedRequestId: '6ti0wKlg+prvrNR+vdi6iKK7oKVCoRnAm9MPh8JFDHCl1p8NdZoxgHYu23x7GRysWH/HLkHEdmM=',
+  cfId: undefined,
+  statusCode: 404,
+  retryable: false,
+  retryDelay: 31.846888939887098
+}
