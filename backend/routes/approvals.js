@@ -157,16 +157,21 @@ router.post('/contract/:contractId/stage/:stage', authenticateToken, async (req,
 
       await client.query('COMMIT');
 
-      // Log activity
-      await pool.query(`
-        INSERT INTO activity_logs (user_id, document_id, action, action_detail)
-        VALUES ($1, $2, $3, $4)
-      `, [
-        userId,
-        contract.document_id,
-        `contract_${action}`,
-        `${action === 'approve' ? 'Approved' : 'Rejected'} contract ${contract.contract_number} at stage ${formatStageName(stage)}. Comments: ${comments || 'None'}`
-      ]);
+      // Log activity - get first document associated with this contract for logging
+      const firstDocResult = await pool.query('SELECT document_id FROM documents WHERE contract_id = $1 LIMIT 1', [contractId]);
+      const documentId = firstDocResult.rows.length > 0 ? firstDocResult.rows[0].document_id : null;
+      
+      if (documentId) {
+        await pool.query(`
+          INSERT INTO activity_logs (user_id, document_id, action, action_detail)
+          VALUES ($1, $2, $3, $4)
+        `, [
+          userId,
+          documentId,
+          `contract_${action}`,
+          `${action === 'approve' ? 'Approved' : 'Rejected'} contract ${contract.contract_number} at stage ${formatStageName(stage)}. Comments: ${comments || 'None'}`
+        ]);
+      }
 
       res.json({
         success: true,
@@ -206,16 +211,18 @@ router.get('/pending', authenticateToken, async (req, res) => {
       SELECT 
         c.*,
         u_gen.full_name as generated_by_name,
-        d.file_name as document_file_name
+        COUNT(d.document_id) as document_count,
+        ARRAY_AGG(d.file_name) FILTER (WHERE d.file_name IS NOT NULL) as document_file_names
       FROM contracts c
       LEFT JOIN users u_gen ON c.generated_by = u_gen.user_id
-      LEFT JOIN documents d ON c.document_id = d.document_id
+      LEFT JOIN documents d ON d.contract_id = c.contract_id
       WHERE c.current_approval_stage = ANY($1)
         AND c.status NOT IN ('approved', 'rejected')
         AND c.contract_id NOT IN (
           SELECT contract_id FROM contract_approvals 
           WHERE stage = c.current_approval_stage AND approver_id = $2
         )
+      GROUP BY c.contract_id, u_gen.full_name
       ORDER BY c.generated_at ASC
     `, [userStages, req.user.user_id]);
 

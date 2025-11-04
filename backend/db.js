@@ -96,6 +96,40 @@ async function runMigrations() {
       }
     }
 
+    // Migration 4: Fix contract-document relationship from 1-to-1 to 1-to-many
+    if (currentVersion < 4) {
+      console.log('📦 Applying migration 4 - Fixing contract-document relationship...');
+      
+      try {
+        // Add contract_id column to documents table if it doesn't exist
+        await client.query(`
+          DO $$ 
+          BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='documents' AND column_name='contract_id') THEN
+              ALTER TABLE documents ADD COLUMN contract_id INTEGER REFERENCES contracts(contract_id);
+            END IF;
+          END $$;
+        `);
+        
+        // Remove document_id column from contracts table if it exists
+        await client.query(`
+          DO $$ 
+          BEGIN
+            IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='contracts' AND column_name='document_id') THEN
+              ALTER TABLE contracts DROP COLUMN document_id;
+            END IF;
+          END $$;
+        `);
+        
+        await client.query('INSERT INTO schema_version (version) VALUES (4) ON CONFLICT (version) DO NOTHING');
+        console.log('✅ Migration 4 completed successfully - Contract-document relationship is now 1-to-many');
+        
+      } catch (error) {
+        console.error('❌ Error in migration 4:', error.message);
+        throw error;
+      }
+    }
+
     console.log('✅ All migrations completed');
     
   } catch (error) {
@@ -128,7 +162,8 @@ async function createTables() {
         status VARCHAR(50) CHECK (status IN ('Uploaded', 'Extracted', 'Validated', 'Approved', 'Rejected')),
         textract_job_id VARCHAR(255),
         ocr_extracted_json JSONB,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        contract_id INTEGER
       );
       CREATE TABLE IF NOT EXISTS extracted_fields (
         field_id SERIAL PRIMARY KEY,
@@ -142,7 +177,6 @@ async function createTables() {
       );
       CREATE TABLE IF NOT EXISTS contracts (
         contract_id SERIAL PRIMARY KEY,
-        document_id INT REFERENCES documents(document_id),
         contract_number VARCHAR(50) UNIQUE,
         customer_name VARCHAR(256),
         property_address TEXT,
@@ -165,7 +199,8 @@ async function createTables() {
         status VARCHAR(20) NOT NULL,
         comments TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(contract_id, stage)
       );
       CREATE TABLE IF NOT EXISTS integrations (
         integration_id SERIAL PRIMARY KEY,
@@ -175,6 +210,18 @@ async function createTables() {
         integration TEXT,
         timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+      
+      -- Add foreign key constraint for documents.contract_id if it doesn't exist
+      DO $$ 
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.table_constraints 
+          WHERE constraint_name = 'documents_contract_id_fkey'
+        ) THEN
+          ALTER TABLE documents ADD CONSTRAINT documents_contract_id_fkey 
+          FOREIGN KEY (contract_id) REFERENCES contracts(contract_id);
+        END IF;
+      END $$;
       CREATE TABLE IF NOT EXISTS activity_logs (
         log_id SERIAL PRIMARY KEY,
         user_id INT REFERENCES users(user_id),
@@ -236,8 +283,8 @@ async function createContract(data) {
   const client = await pool.connect();
   try {
     const result = await client.query(
-      'INSERT INTO contracts (document_id, contract_number, customer_name, property_address, loan_amount, generated_pot_uri, generated_by, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
-      [data.document_id, data.contract_number, data.customer_name, data.property_address, data.loan_amount, data.generated_pot_uri, data.generated_by, data.status || 'started']
+      'INSERT INTO contracts (contract_number, customer_name, property_address, loan_amount, generated_pot_uri, generated_by, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+      [data.contract_number, data.customer_name, data.property_address, data.loan_amount, data.generated_pot_uri, data.generated_by, data.status || 'started']
     );
     return result.rows[0];
   } finally {
