@@ -37,13 +37,32 @@ router.get('/', authenticateToken, async (req, res) => {
 // Update document by ID (protected)
 router.put('/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
-  const { file_name, ss_uri, document_type, upload_user_id, textract_job_id, status } = req.body;
+  
   try {
+    // Get current document data first
+    const currentDoc = await pool.query('SELECT * FROM documents WHERE document_id = $1', [id]);
+    if (currentDoc.rows.length === 0) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+
+    const current = currentDoc.rows[0];
+    const { file_name, ss_uri, document_type, upload_user_id, textract_job_id, status, contract_id } = req.body;
+    
+    // Use current values if not provided in request
     const result = await pool.query(
-      'UPDATE documents SET file_name = $1, ss_uri = $2, document_type = $3, upload_user_id = $4, textract_job_id = $5, status = $6 WHERE document_id = $7 RETURNING *',
-      [file_name, ss_uri, document_type, upload_user_id, textract_job_id, status, id]
+      'UPDATE documents SET file_name = $1, ss_uri = $2, document_type = $3, upload_user_id = $4, textract_job_id = $5, status = $6, contract_id = $7, updated_at = CURRENT_TIMESTAMP WHERE document_id = $8 RETURNING *',
+      [
+        file_name !== undefined ? file_name : current.file_name,
+        ss_uri !== undefined ? ss_uri : current.ss_uri,
+        document_type !== undefined ? document_type : current.document_type,
+        upload_user_id !== undefined ? upload_user_id : current.upload_user_id,
+        textract_job_id !== undefined ? textract_job_id : current.textract_job_id,
+        status !== undefined ? status : current.status,
+        contract_id !== undefined ? contract_id : current.contract_id,
+        id
+      ]
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Document not found' });
+    
     res.json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ error: err.message });

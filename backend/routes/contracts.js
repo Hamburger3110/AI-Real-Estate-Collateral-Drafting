@@ -98,13 +98,12 @@ router.post('/seed', authenticateToken, async (req, res) => {
 
 // Create contract (protected & validated)
 router.post('/', authenticateToken, async (req, res) => {
-  const { document_id, contract_number, customer_name, property_address, loan_amount, generated_by } = req.body;
-  if (!document_id || !contract_number || !customer_name || !property_address || loan_amount === undefined || !generated_by) {
+  const { document_ids, contract_number, customer_name, property_address, loan_amount, generated_by } = req.body;
+  if (!contract_number || !customer_name || !property_address || loan_amount === undefined || !generated_by) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
   try {
     const contract = await createContract({
-      document_id,
       contract_number,
       customer_name,
       property_address,
@@ -113,7 +112,52 @@ router.post('/', authenticateToken, async (req, res) => {
       generated_by,
       status: 'started'
     });
+
+    // If document_ids are provided, link them to this contract
+    if (document_ids && Array.isArray(document_ids)) {
+      for (const documentId of document_ids) {
+        await pool.query('UPDATE documents SET contract_id = $1 WHERE document_id = $2', [contract.contract_id, documentId]);
+      }
+    }
+
     res.json(contract);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Validate contract completion (protected) - ensures documents are attached
+router.put('/:id/validate', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  try {
+    // Check if contract exists
+    const contractResult = await pool.query('SELECT * FROM contracts WHERE contract_id = $1', [id]);
+    if (contractResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Contract not found' });
+    }
+
+    // Check if contract has at least one attached document
+    const documentsResult = await pool.query('SELECT COUNT(*) FROM documents WHERE contract_id = $1', [id]);
+    const documentCount = parseInt(documentsResult.rows[0].count);
+
+    if (documentCount === 0) {
+      return res.status(400).json({ 
+        error: 'Contract validation failed: At least one document must be attached to complete the contract.',
+        document_count: documentCount
+      });
+    }
+
+    // Update contract status if validation passes
+    const updatedContract = await pool.query(
+      'UPDATE contracts SET status = $1, current_approval_stage = $2 WHERE contract_id = $3 RETURNING *',
+      ['completed', 'document_review_complete', id]
+    );
+
+    res.json({
+      message: 'Contract validation successful',
+      contract: updatedContract.rows[0],
+      document_count: documentCount
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -127,12 +171,14 @@ router.get('/', authenticateToken, async (req, res) => {
         c.*,
         u_gen.full_name as generated_by_name,
         u_app.full_name as approved_by_name,
-        d.file_name as document_file_name,
-        d.document_type
+        COUNT(d.document_id) as document_count,
+        ARRAY_AGG(d.file_name) FILTER (WHERE d.file_name IS NOT NULL) as document_file_names,
+        ARRAY_AGG(d.document_type) FILTER (WHERE d.document_type IS NOT NULL) as document_types
       FROM contracts c
       LEFT JOIN users u_gen ON c.generated_by = u_gen.user_id
       LEFT JOIN users u_app ON c.approved_by = u_app.user_id
-      LEFT JOIN documents d ON c.document_id = d.document_id
+      LEFT JOIN documents d ON d.contract_id = c.contract_id
+      GROUP BY c.contract_id, u_gen.full_name, u_app.full_name
       ORDER BY c.generated_at DESC
     `);
     res.json(result.rows);
@@ -149,20 +195,28 @@ router.get('/:id', authenticateToken, async (req, res) => {
       SELECT 
         c.*,
         u_gen.full_name as generated_by_name,
-        u_app.full_name as approved_by_name,
-        d.file_name as document_file_name,
-        d.document_type
+        u_app.full_name as approved_by_name
       FROM contracts c
       LEFT JOIN users u_gen ON c.generated_by = u_gen.user_id
       LEFT JOIN users u_app ON c.approved_by = u_app.user_id
-      LEFT JOIN documents d ON c.document_id = d.document_id
       WHERE c.contract_id = $1
     `, [id]);
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Contract not found' });
     }
-    res.json(result.rows[0]);
+
+    // Get associated documents
+    const documentsResult = await pool.query(`
+      SELECT document_id, file_name, document_type, upload_date, status, ss_uri
+      FROM documents 
+      WHERE contract_id = $1
+      ORDER BY upload_date DESC
+    `, [id]);
+
+    const contract = result.rows[0];
+    contract.documents = documentsResult.rows;
+    res.json(contract);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
