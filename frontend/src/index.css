@@ -11,3 +11,36 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+/* Fix modal overlay and z-index issues */
+.ant-modal-mask {
+  z-index: 1000 !important;
+}
+
+.ant-modal-wrap {
+  z-index: 1000 !important;
+}
+
+.ant-modal {
+  z-index: 1001 !important;
+}
+
+/* Ensure modals appear above all other content */
+.ant-modal-root {
+  z-index: 1000 !important;
+}
+
+/* Fix dropdown menus in modals */
+.ant-dropdown {
+  z-index: 1010 !important;
+}
+
+/* Fix select dropdowns in modals */
+.ant-select-dropdown {
+  z-index: 1010 !important;
+}
+
+/* Fix tooltip z-index */
+.ant-tooltip {
+  z-index: 1015 !important;
+}

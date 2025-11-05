@@ -59,29 +59,63 @@ router.post('/webhook', async (req, res) => {
       return res.status(500).json({ error: 'Failed to parse extraction result' });
     }
 
-    // Update document with extraction results
-    const updateQuery = `
-      UPDATE documents 
-      SET 
-        status = $1,
-        ocr_extracted_json = $2,
-        confidence_score = $3,
-        needs_manual_review = $4,
-        extraction_completed_at = CURRENT_TIMESTAMP,
-        textract_job_id = $5,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE document_id = $6
-      RETURNING *
-    `;
+    const client = await pool.connect();
+    
+    try {
+      await client.query('BEGIN');
+      
+      // Update document with extraction results
+      const updateQuery = `
+        UPDATE documents 
+        SET 
+          status = $1,
+          ocr_extracted_json = $2,
+          confidence_score = $3,
+          needs_manual_review = $4,
+          extraction_completed_at = CURRENT_TIMESTAMP,
+          textract_job_id = $5,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE document_id = $6
+        RETURNING *
+      `;
 
-    const updatedDocument = await pool.query(updateQuery, [
-      'Extracted', // Update status to Extracted
-      JSON.stringify(parsedResult.rawResponse), // Store full FPT.AI response
-      parsedResult.confidenceScore,
-      parsedResult.needsManualReview,
-      job_id || 'fptai-job',
-      document_id
-    ]);
+      const updatedDocument = await client.query(updateQuery, [
+        parsedResult.needsManualReview ? 'Needs Review' : 'Extracted', // Status based on confidence
+        JSON.stringify(parsedResult.rawResponse), // Store full FPT.AI response
+        parsedResult.confidenceScore,
+        parsedResult.needsManualReview,
+        job_id || 'fptai-job',
+        document_id
+      ]);
+      
+      // If confidence is high (≥95%), automatically store extracted fields
+      if (!parsedResult.needsManualReview && parsedResult.extractedFields) {
+        for (const field of parsedResult.extractedFields) {
+          await client.query(
+            `INSERT INTO extracted_fields 
+             (document_id, field_name, field_value, confidence_score, validated, validated_at)
+             VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
+             ON CONFLICT (document_id, field_name) 
+             DO UPDATE SET field_value = $3, confidence_score = $4, validated = $5, validated_at = CURRENT_TIMESTAMP`,
+            [document_id, field.field_name, field.field_value, field.confidence_score, true]
+          );
+        }
+        
+        // Update document status to validated
+        await client.query(
+          'UPDATE documents SET status = $1 WHERE document_id = $2',
+          ['Validated', document_id]
+        );
+      }
+      
+      await client.query('COMMIT');
+      
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
 
     console.log(`✅ Document ${document_id} extraction completed:`);
     console.log(`   - Confidence Score: ${parsedResult.confidenceScore}%`);

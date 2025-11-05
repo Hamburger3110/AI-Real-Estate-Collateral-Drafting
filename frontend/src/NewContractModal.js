@@ -3,11 +3,11 @@ import {
   Modal,
   Form,
   Input,
+  InputNumber,
   Button,
   Steps,
   Upload,
   Select,
-  InputNumber,
   Space,
   Card,
   List,
@@ -16,22 +16,21 @@ import {
   Divider,
   Progress,
   Tag,
-  Spin
+  Spin,
+  Alert
 } from 'antd';
 import {
   InboxOutlined,
   FileTextOutlined,
-  DollarOutlined,
-  HomeOutlined,
-  UserOutlined,
   DeleteOutlined,
-  CheckCircleOutlined
+  CheckCircleOutlined,
+  EditOutlined,
+  ReloadOutlined
 } from '@ant-design/icons';
 import { useAuth } from './contexts/AuthContext';
 
 const { Dragger } = Upload;
 const { Text } = Typography;
-const { TextArea } = Input;
 const { Option } = Select;
 
 const NewContractModal = ({ visible, onCancel, onSuccess }) => {
@@ -44,7 +43,94 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
   const [uploadProgress, setUploadProgress] = useState({});
   const [contractData, setContractData] = useState(null);
   const [autoCreating, setAutoCreating] = useState(false);
+  const [editableExtractedData, setEditableExtractedData] = useState({});
+  const [editingDocument, setEditingDocument] = useState(null);
   const { user, token } = useAuth();
+
+  // Helper function to get extracted data from document
+  const getExtractedData = (item) => {
+    try {
+      console.log('item', item)
+      console.log('🔍 Checking extracted data for item:', item?.name, {
+        hasExtractedData: !!item?.extracted_data,
+        hasOcrExtractedJson: !!item?.ocr_extracted_json,
+        ocrDataStructure: item?.ocr_extracted_json ? Object.keys(item.ocr_extracted_json) : 'none'
+      });
+      
+      // Check for traditional extracted_data format
+      if (item?.extracted_data && typeof item.extracted_data === 'object' && Object.keys(item.extracted_data).length > 0) {
+        console.log('✅ Found traditional extracted_data');
+        return item.extracted_data;
+      }
+      
+      // Check for ocr_extracted_json format from FPT.AI
+      if (item?.ocr_extracted_json && typeof item.ocr_extracted_json === 'object') {
+        // The actual extracted fields are nested under 'data'
+        if (item.ocr_extracted_json?.raw_response?.data?.[0] && typeof item.ocr_extracted_json.raw_response.data[0] === 'object' && Object.keys(item.ocr_extracted_json.raw_response.data).length > 0) {
+          console.log('✅ Found ocr_extracted_json.data with keys:', Object.keys(item.ocr_extracted_json.raw_response.data[0]));
+          return item.ocr_extracted_json.raw_response.data[0];
+        }
+        // Fallback to top level if no nested data
+        if (Object.keys(item.ocr_extracted_json).length > 0) {
+          console.log('⚠️ Using ocr_extracted_json top level');
+          return item.ocr_extracted_json;
+        }
+      }
+      
+      console.log('❌ No extracted data found');
+      return null;
+    } catch (error) {
+      console.error('Error in getExtractedData:', error);
+      return null;
+    }
+  };
+
+  // Helper function to get confidence score from document
+  const getConfidenceScore = (item) => {
+    // Check traditional confidence_score field
+    if (item.confidence_score !== undefined && item.confidence_score !== null && typeof item.confidence_score === 'number') {
+      return item.confidence_score;
+    }
+    
+    // Check ocr_extracted_json format
+    if (item.ocr_extracted_json && typeof item.ocr_extracted_json.confidence_score === 'number') {
+      return item.ocr_extracted_json.confidence_score;
+    }
+    
+    // Check if confidence score is nested deeper in ocr_extracted_json
+    if (item.ocr_extracted_json && item.ocr_extracted_json.raw_response && typeof item.ocr_extracted_json.raw_response.confidence_score === 'number') {
+      return item.ocr_extracted_json.raw_response.confidence_score;
+    }
+    
+    return null;
+  };
+
+  // Helper function to check if document needs manual review
+  const needsManualReview = (item) => {
+    // Check traditional needs_manual_review field
+    if (typeof item.needs_manual_review === 'boolean') {
+      return item.needs_manual_review;
+    }
+    
+    // Check ocr_extracted_json format
+    if (item.ocr_extracted_json && typeof item.ocr_extracted_json.needs_manual_review === 'boolean') {
+      return item.ocr_extracted_json.needs_manual_review;
+    }
+    
+    // Check if needs_manual_review is nested deeper
+    if (item.ocr_extracted_json && item.ocr_extracted_json.raw_response && typeof item.ocr_extracted_json.raw_response.needs_manual_review === 'boolean') {
+      return item.ocr_extracted_json.raw_response.needs_manual_review;
+    }
+    
+    // Fallback based on confidence score
+    const confidence = getConfidenceScore(item);
+    if (confidence !== null && typeof confidence === 'number') {
+      return confidence < 95;
+    }
+    
+    // Default to true if we can't determine confidence
+    return true;
+  };
 
   // Generate unique contract number
   const generateContractNumber = () => {
@@ -129,56 +215,7 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
     { value: 'Financial Statement', label: 'Financial Statement' }
   ];
 
-  const handleContractSubmit = async (values) => {
-    try {
-      setLoading(true);
-      
-      console.log('Creating contract with values:', values);
-      
-      const response = await fetch('http://localhost:3001/contracts', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          ...values,
-          generated_by: user.user_id
-        })
-      });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        
-        if (errorData.error && errorData.error.includes('duplicate key value violates unique constraint')) {
-          if (errorData.error.includes('contract_number')) {
-            // Auto-generate a new contract number and suggest retry
-            const newNumber = generateContractNumber();
-            contractForm.setFieldsValue({ contract_number: newNumber });
-            throw new Error('Contract number already exists. A new unique number has been generated. Please try again.');
-          }
-        }
-        
-        throw new Error(`Failed to create contract: ${errorData.error || 'Unknown error'}`);
-      }
-
-      const contract = await response.json();
-      console.log('Contract created successfully:', contract);
-      setContractData(contract);
-      message.success('Contract created successfully! You can now upload documents.');
-      
-      // Move to next step
-      setTimeout(() => {
-        setCurrentStep(1);
-      }, 500);
-      
-    } catch (error) {
-      console.error('Error creating contract:', error);
-      message.error('Failed to create contract: ' + error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const uploadProps = {
     name: 'file',
@@ -264,11 +301,36 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
               throw new Error(`Failed to link document: ${linkError.error || 'Unknown error'}`);
             }
 
-            setUploadedDocuments(prev => [...prev, {
+            // Fetch the updated document data with ocr_extracted_json
+            const updatedDocResponse = await fetch(`http://localhost:3001/documents/${result.document_id}`, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${token}`
+              }
+            });
+
+            let finalDocumentData = {
               ...result,
               type: fileItem.type,
               name: fileItem.file.name
-            }]);
+            };
+
+            if (updatedDocResponse.ok) {
+              const updatedDoc = await updatedDocResponse.json();
+              console.log('🔄 Updated document data:', updatedDoc);
+              
+              // Merge the updated document data with our existing data
+              finalDocumentData = {
+                ...finalDocumentData,
+                ...updatedDoc,
+                type: fileItem.type, // Keep the original type
+                name: fileItem.file.name // Keep the original name
+              };
+            } else {
+              console.warn('Failed to fetch updated document data:', updatedDocResponse.status);
+            }
+
+            setUploadedDocuments(prev => [...prev, finalDocumentData]);
             
             setFileList(prev => prev.map(item => 
               item.uid === fileItem.uid 
@@ -397,6 +459,53 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
     setFileList(prev => prev.filter(item => item.uid !== uid));
   };
 
+  // Function to refresh document data from server
+  const refreshDocumentData = async () => {
+    if (!contractData || uploadedDocuments.length === 0) return;
+
+    try {
+      console.log('🔄 Refreshing document data for', uploadedDocuments.length, 'documents');
+      
+      const refreshPromises = uploadedDocuments.map(async (doc) => {
+        if (!doc.document_id) return doc;
+
+        const response = await fetch(`http://localhost:3001/documents/${doc.document_id}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (response.ok) {
+          const updatedDoc = await response.json();
+          console.log(`✅ Refreshed data for document ${doc.document_id}:`, {
+            hasOcrData: !!updatedDoc.ocr_extracted_json,
+            status: updatedDoc.status,
+            confidenceScore: updatedDoc.confidence_score
+          });
+          
+          return {
+            ...doc,
+            ...updatedDoc,
+            type: doc.type, // Preserve original type
+            name: doc.name  // Preserve original name
+          };
+        } else {
+          console.warn(`Failed to refresh document ${doc.document_id}:`, response.status);
+          return doc;
+        }
+      });
+
+      const refreshedDocuments = await Promise.all(refreshPromises);
+      setUploadedDocuments(refreshedDocuments);
+      
+      message.info('Document data refreshed successfully!');
+    } catch (error) {
+      console.error('Error refreshing document data:', error);
+      message.warning('Failed to refresh some document data');
+    }
+  };
+
   const handleFinish = async () => {
     // Validate that at least one document has been uploaded and linked
     const uploadedDocs = uploadedDocuments.filter(doc => doc.document_id);
@@ -417,6 +526,42 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
     try {
       setLoading(true);
       
+      // Save any edited extracted data first
+      if (Object.keys(editableExtractedData).length > 0) {
+        for (const [fieldKey, newValue] of Object.entries(editableExtractedData)) {
+          const [documentId, fieldName] = fieldKey.split('_');
+          
+          try {
+            const saveResponse = await fetch(`http://localhost:3001/documents/${documentId}/validate`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                document_id: documentId,
+                fields: [{ 
+                  field_name: fieldName, 
+                  field_value: newValue, 
+                  validated: true, 
+                  confidence_score: 100,
+                  manually_corrected: true 
+                }],
+                overall_confidence: 100,
+                needs_manual_review: false
+              })
+            });
+
+            if (!saveResponse.ok) {
+              console.warn(`Failed to save edited field ${fieldName} for document ${documentId}`);
+            }
+          } catch (saveError) {
+            console.warn('Error saving edited field:', saveError);
+          }
+        }
+        message.info('Edited field values have been saved.');
+      }
+      
       // Call backend validation endpoint
       const response = await fetch(`http://localhost:3001/contracts/${contractData.contract_id}/validate`, {
         method: 'PUT',
@@ -432,7 +577,7 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
       }
 
       const result = await response.json();
-      message.success(`Contract completed successfully! ${result.document_count} document(s) verified and attached.`);
+      message.success(`Contract created successfully! ${result.document_count} document(s) verified and attached. Approval workflow has been started.`);
       onSuccess();
       handleCancel();
     } catch (error) {
@@ -450,84 +595,14 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
     setUploadedDocuments([]);
     setUploadProgress({});
     setAutoCreating(false);
+    setEditableExtractedData({});
+    setEditingDocument(null);
     contractForm.resetFields();
     documentForm.resetFields();
     onCancel();
   };
 
-  const renderContractForm = () => (
-    <Form
-      form={contractForm}
-      layout="vertical"
-      onFinish={handleContractSubmit}
-    >
-      <Form.Item
-        label="Contract Number"
-        name="contract_number"
-        rules={[{ required: true, message: 'Please enter contract number' }]}
-      >
-        <Input 
-          prefix={<FileTextOutlined />} 
-          placeholder="Auto-generated unique number"
-          readOnly
-          addonAfter={
-            <Button 
-              type="link" 
-              onClick={() => {
-                const newNumber = generateContractNumber();
-                contractForm.setFieldsValue({ contract_number: newNumber });
-              }}
-              style={{ padding: '0 8px', height: '100%' }}
-            >
-              Generate New
-            </Button>
-          }
-        />
-      </Form.Item>
 
-      <Form.Item
-        label="Customer Name"
-        name="customer_name"
-        rules={[{ required: true, message: 'Please enter customer name' }]}
-      >
-        <Input prefix={<UserOutlined />} placeholder="Full customer name" />
-      </Form.Item>
-
-      <Form.Item
-        label="Property Address"
-        name="property_address"
-        rules={[{ required: true, message: 'Please enter property address' }]}
-      >
-        <TextArea 
-          prefix={<HomeOutlined />} 
-          placeholder="Complete property address"
-          rows={3}
-        />
-      </Form.Item>
-
-      <Form.Item
-        label="Loan Amount"
-        name="loan_amount"
-        rules={[{ required: true, message: 'Please enter loan amount' }]}
-      >
-        <InputNumber
-          prefix={<DollarOutlined />}
-          style={{ width: '100%' }}
-          placeholder="0.00"
-          min={0}
-          step={1000}
-          formatter={value => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-          parser={value => value.replace(/\$\s?|(,*)/g, '')}
-        />
-      </Form.Item>
-
-      <Form.Item>
-        <Button type="primary" htmlType="submit" loading={loading} block>
-          {loading ? 'Creating Contract...' : 'Create Contract & Continue'}
-        </Button>
-      </Form.Item>
-    </Form>
-  );
 
   const renderDocumentUpload = () => (
     <div>
@@ -614,7 +689,10 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
       <Space>
         <Button 
           type="primary" 
-          onClick={() => setCurrentStep(1)}
+          onClick={async () => {
+            await refreshDocumentData();
+            setCurrentStep(1);
+          }}
           disabled={uploadedDocuments.filter(doc => doc.document_id).length === 0}
         >
           {uploadedDocuments.filter(doc => doc.document_id).length === 0 
@@ -641,130 +719,220 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
         )}
       </Card>
 
-      <Card title="Document Extraction Results" style={{ marginBottom: 16 }}>
+      <Card 
+        title="Document Extraction Results" 
+        extra={
+          <Button 
+            type="link" 
+            icon={<ReloadOutlined />}
+            onClick={refreshDocumentData}
+            size="small"
+          >
+            Refresh Data
+          </Button>
+        }
+        style={{ marginBottom: 16 }}
+      >
         {uploadedDocuments.filter(doc => doc.document_id).length > 0 ? (
           <>
-            <List
-              dataSource={uploadedDocuments.filter(doc => doc.document_id)}
-              renderItem={(item) => (
-                <List.Item
-                  style={{
-                    border: item.needs_manual_review ? '1px solid #faad14' : '1px solid #d9d9d9',
-                    padding: 16,
-                    marginBottom: 12,
-                    borderRadius: 8,
-                    backgroundColor: item.needs_manual_review ? '#fffbf0' : '#ffffff'
-                  }}
-                >
-                  <List.Item.Meta
-                    avatar={
-                      item.needs_manual_review ? (
-                        <CheckCircleOutlined style={{ fontSize: 24, color: '#faad14' }} />
-                      ) : (
-                        <CheckCircleOutlined style={{ fontSize: 24, color: '#52c41a' }} />
-                      )
-                    }
-                    title={
-                      <Space direction="vertical" size={4} style={{ width: '100%' }}>
-                        <Text strong>{item.name}</Text>
-                        <Space>
-                          <Tag color="blue">{item.type}</Tag>
-                          {item.status === 'Extracted' && item.confidence_score !== undefined && (
-                            <>
-                              {item.needs_manual_review ? (
-                                <Tag color="warning" icon={<CheckCircleOutlined />}>
-                                  Extracted - Confidence: {item.confidence_score?.toFixed(1)}%
-                                </Tag>
-                              ) : (
-                                <Tag color="success" icon={<CheckCircleOutlined />}>
-                                  Extracted - Confidence: {item.confidence_score?.toFixed(1)}%
-                                </Tag>
-                              )}
-                            </>
-                          )}
-                          {item.status === 'Processing' && (
-                            <Tag color="processing">Processing...</Tag>
-                          )}
-                          {!item.status || item.status === 'Uploaded' && (
-                            <Tag color="default">Uploaded</Tag>
-                          )}
-                        </Space>
-                      </Space>
-                    }
-                    description={
-                      <div style={{ marginTop: 8 }}>
-                        {item.needs_manual_review && (
-                          <div style={{ 
-                            padding: 8, 
-                            backgroundColor: '#fff7e6', 
-                            border: '1px solid #ffd591',
-                            borderRadius: 4,
-                            marginBottom: 8
-                          }}>
-                            <Text type="warning" strong>⚠️ Manual Review Required</Text>
-                            <br />
-                            <Text type="secondary" style={{ fontSize: '12px' }}>
-                              Confidence score is below 95%. Please review extracted information after completing contract creation.
-                            </Text>
-                          </div>
-                        )}
-                        
-                        {item.extracted_data && Object.keys(item.extracted_data).length > 0 && (
-                          <div style={{ marginTop: 8 }}>
-                            <Text strong style={{ fontSize: '12px' }}>Extracted Information:</Text>
-                            <div style={{ 
-                              marginTop: 4, 
-                              padding: 8, 
-                              backgroundColor: '#f5f5f5',
-                              borderRadius: 4,
-                              fontSize: '12px'
-                            }}>
-                              {Object.entries(item.extracted_data).slice(0, 5).map(([key, value]) => {
-                                const displayValue = typeof value === 'object' ? value.value : value;
-                                return (
-                                  <div key={key} style={{ marginBottom: 4 }}>
-                                    <Text type="secondary">{key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}:</Text>{' '}
-                                    <Text>{displayValue || 'N/A'}</Text>
-                                  </div>
-                                );
-                              })}
-                              {Object.keys(item.extracted_data).length > 5 && (
-                                <Text type="secondary" style={{ fontStyle: 'italic' }}>
-                                  ... and {Object.keys(item.extracted_data).length - 5} more fields
-                                </Text>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                        
-                        {item.status === 'Extracted' && !item.needs_manual_review && (
-                          <div style={{ 
-                            marginTop: 8,
-                            padding: 8, 
-                            backgroundColor: '#f6ffed', 
-                            border: '1px solid #b7eb8f',
-                            borderRadius: 4
-                          }}>
-                            <Text type="success" style={{ fontSize: '12px' }}>
-                              ✅ High confidence extraction - No manual review required
-                            </Text>
-                          </div>
-                        )}
-                      </div>
-                    }
+            {uploadedDocuments.filter(doc => doc.document_id).map((item, index) => (
+              <Card
+                key={item.document_id || index}
+                size="small"
+                style={{
+                  marginBottom: 16,
+                  border: item.needs_manual_review ? '1px solid #faad14' : '1px solid #d9d9d9',
+                  backgroundColor: item.needs_manual_review ? '#fffbf0' : '#ffffff'
+                }}
+                title={
+                  <Space>
+                    <FileTextOutlined style={{ color: '#1890ff' }} />
+                    <Text strong>{item.name}</Text>
+                    <Tag color="blue">{item.type}</Tag>
+                    {(() => {
+                      const confidenceScore = getConfidenceScore(item);
+                      return item.status === 'Extracted' && confidenceScore !== null && typeof confidenceScore === 'number' && (
+                        <Tag color={needsManualReview(item) ? "warning" : "success"} icon={<CheckCircleOutlined />}>
+                          Confidence: {confidenceScore.toFixed(1)}%
+                        </Tag>
+                      );
+                    })()}
+                    {item.status === 'Processing' && (
+                      <Tag color="processing">Processing...</Tag>
+                    )}
+                    {(!item.status || item.status === 'Uploaded') && (
+                      <Tag color="default">Uploaded</Tag>
+                    )}
+                  </Space>
+                }
+                extra={
+                  getExtractedData(item) && (
+                    <Button
+                      type="link"
+                      icon={<EditOutlined />}
+                      onClick={() => setEditingDocument(editingDocument === item.document_id ? null : item.document_id)}
+                    >
+                      {editingDocument === item.document_id ? 'Hide Fields' : 'Edit Fields'}
+                    </Button>
+                  )
+                }
+              >
+                {needsManualReview(item) && (
+                  <Alert
+                    message="Manual Review Required"
+                    description="Confidence score is below 95%. Please review and edit the extracted information below."
+                    type="warning"
+                    style={{ marginBottom: 12 }}
+                    showIcon
                   />
-                </List.Item>
-              )}
-            />
+                )}
+
+                {getExtractedData(item) ? (
+                  <div>
+                    {editingDocument === item.document_id ? (
+                      // Editable form view
+                      <div style={{ marginTop: 8 }}>
+                        <Text strong style={{ marginBottom: 8, display: 'block' }}>
+                          Edit Extracted Fields (Click field values to edit):
+                        </Text>
+                        <Form layout="vertical" size="small">
+                          {Object.entries(getExtractedData(item)).map(([key, value]) => {
+                            const displayValue = typeof value === 'object' ? value.value : value;
+                            const fieldKey = `${item.document_id}_${key}`;
+                            
+                            return (
+                              <Form.Item
+                                key={fieldKey}
+                                label={
+                                  <Text strong style={{ fontSize: '12px' }}>
+                                    {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                  </Text>
+                                }
+                                style={{ marginBottom: 8 }}
+                              >
+                                {key.toLowerCase().includes('address') || (typeof displayValue === 'string' && displayValue.length > 50) ? (
+                                  <Input.TextArea
+                                    rows={2}
+                                    defaultValue={displayValue || ''}
+                                    placeholder={`Enter ${key.replace(/_/g, ' ')}`}
+                                    onChange={(e) => {
+                                      setEditableExtractedData(prev => ({
+                                        ...prev,
+                                        [fieldKey]: e.target.value
+                                      }));
+                                    }}
+                                  />
+                                ) : key.toLowerCase().includes('amount') || key.toLowerCase().includes('price') ? (
+                                  <InputNumber
+                                    style={{ width: '100%' }}
+                                    defaultValue={parseFloat(displayValue) || 0}
+                                    placeholder={`Enter ${key.replace(/_/g, ' ')}`}
+                                    formatter={value => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                                    parser={value => value.replace(/\$\s?|(,*)/g, '')}
+                                    onChange={(value) => {
+                                      setEditableExtractedData(prev => ({
+                                        ...prev,
+                                        [fieldKey]: value
+                                      }));
+                                    }}
+                                  />
+                                ) : (
+                                  <Input
+                                    defaultValue={displayValue || ''}
+                                    placeholder={`Enter ${key.replace(/_/g, ' ')}`}
+                                    onChange={(e) => {
+                                      setEditableExtractedData(prev => ({
+                                        ...prev,
+                                        [fieldKey]: e.target.value
+                                      }));
+                                    }}
+                                  />
+                                )}
+                              </Form.Item>
+                            );
+                          })}
+                          <div style={{ textAlign: 'right', marginTop: 12 }}>
+                            <Button 
+                              type="primary" 
+                              size="small"
+                              onClick={() => {
+                                message.success('Field changes saved locally. They will be applied when you complete the contract.');
+                                setEditingDocument(null);
+                              }}
+                            >
+                              Save Changes
+                            </Button>
+                          </div>
+                        </Form>
+                      </div>
+                    ) : (
+                      // Read-only summary view
+                      <div style={{ marginTop: 8 }}>
+                        <Text strong style={{ fontSize: '12px', marginBottom: 8, display: 'block' }}>
+                          Extracted Information:
+                        </Text>
+                        <div style={{ 
+                          padding: 8, 
+                          backgroundColor: '#fafafa',
+                          borderRadius: 4,
+                          fontSize: '12px'
+                        }}>
+                          {Object.entries(getExtractedData(item)).map(([key, value]) => {
+                            const displayValue = typeof value === 'object' ? value.value : value;
+                            const fieldKey = `${item.document_id}_${key}`;
+                            const editedValue = editableExtractedData[fieldKey];
+                            
+                            return (
+                              <div key={key} style={{ marginBottom: 6, display: 'flex', justifyContent: 'space-between' }}>
+                                <Text type="secondary" style={{ minWidth: '120px' }}>
+                                  {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}:
+                                </Text>
+                                <Text style={{ flex: 1, textAlign: 'right' }}>
+                                  {editedValue !== undefined ? (
+                                    <span style={{ color: '#1890ff', fontWeight: 'bold' }}>
+                                      {editedValue} <Tag size="small" color="blue">edited</Tag>
+                                    </span>
+                                  ) : (
+                                    displayValue || 'N/A'
+                                  )}
+                                </Text>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <Text type="secondary" style={{ fontSize: '12px' }}>
+                    No extracted data available for this document.
+                  </Text>
+                )}
+
+                {item.status === 'Extracted' && !needsManualReview(item) && (
+                  <div style={{ 
+                    marginTop: 8,
+                    padding: 8, 
+                    backgroundColor: '#f6ffed', 
+                    border: '1px solid #b7eb8f',
+                    borderRadius: 4
+                  }}>
+                    <Text type="success" style={{ fontSize: '12px' }}>
+                      ✅ High confidence extraction - Review optional
+                    </Text>
+                  </div>
+                )}
+              </Card>
+            ))}
             <div style={{ marginTop: 16, padding: 12, backgroundColor: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 6 }}>
               <Text type="success">
                 ✅ {uploadedDocuments.filter(doc => doc.document_id).length} document(s) successfully processed
               </Text>
-              {uploadedDocuments.some(doc => doc.needs_manual_review) && (
+              {uploadedDocuments.some(doc => needsManualReview(doc)) && (
                 <>
                   <br />
                   <Text type="warning">
-                    ⚠️ {uploadedDocuments.filter(doc => doc.needs_manual_review).length} document(s) require manual review
+                    ⚠️ {uploadedDocuments.filter(doc => needsManualReview(doc)).length} document(s) require manual review
                   </Text>
                 </>
               )}
@@ -806,7 +974,10 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
       onCancel={handleCancel}
       footer={null}
       width={800}
-      destroyOnClose
+      centered
+      maskClosable={false}
+      destroyOnClose={true}
+      zIndex={1000}
     >
       <Steps current={currentStep} style={{ marginBottom: 24 }}>
         {steps.map((step, index) => (

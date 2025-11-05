@@ -126,7 +126,7 @@ router.post('/', authenticateToken, async (req, res) => {
   }
 });
 
-// Validate contract completion (protected) - ensures documents are attached
+// Validate contract completion (protected) - ensures documents are attached and starts approval workflow
 router.put('/:id/validate', authenticateToken, async (req, res) => {
   const { id } = req.params;
   try {
@@ -147,16 +147,17 @@ router.put('/:id/validate', authenticateToken, async (req, res) => {
       });
     }
 
-    // Update contract status if validation passes
+    // Start approval workflow instead of marking as completed
     const updatedContract = await pool.query(
       'UPDATE contracts SET status = $1, current_approval_stage = $2 WHERE contract_id = $3 RETURNING *',
-      ['completed', 'document_review_complete', id]
+      ['processing', 'document_review', id]
     );
 
     res.json({
-      message: 'Contract validation successful',
+      message: 'Contract validated successfully. Approval workflow has been started.',
       contract: updatedContract.rows[0],
-      document_count: documentCount
+      document_count: documentCount,
+      workflow_status: 'started'
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -225,7 +226,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
 // Update contract by ID (protected)
 router.put('/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
-  const { contract_number, customer_name, property_address, loan_amount, generated_pot_uri, generated_by, status, approved_by } = req.body;
+  const { contract_number, customer_name, property_address, loan_amount, generated_pot_uri, generated_by, status, approved_by, current_approval_stage } = req.body;
   
   try {
     // Get current contract data first
@@ -246,11 +247,12 @@ router.put('/:id', authenticateToken, async (req, res) => {
       generated_by: generated_by !== undefined ? generated_by : currentContract.generated_by,
       status: status !== undefined ? status : currentContract.status,
       approved_by: approved_by !== undefined ? approved_by : currentContract.approved_by,
-      approved_at: status === 'approved' && !currentContract.approved_at ? new Date() : currentContract.approved_at
+      approved_at: status === 'approved' && !currentContract.approved_at ? new Date() : currentContract.approved_at,
+      current_approval_stage: current_approval_stage !== undefined ? current_approval_stage : currentContract.current_approval_stage
     };
     
     const result = await pool.query(
-      'UPDATE contracts SET contract_number = $1, customer_name = $2, property_address = $3, loan_amount = $4, generated_pot_uri = $5, generated_by = $6, status = $7, approved_by = $8, approved_at = $9 WHERE contract_id = $10 RETURNING *',
+      'UPDATE contracts SET contract_number = $1, customer_name = $2, property_address = $3, loan_amount = $4, generated_pot_uri = $5, generated_by = $6, status = $7, approved_by = $8, approved_at = $9, current_approval_stage = $10 WHERE contract_id = $11 RETURNING *',
       [
         updateValues.contract_number,
         updateValues.customer_name,
@@ -261,6 +263,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
         updateValues.status,
         updateValues.approved_by,
         updateValues.approved_at,
+        updateValues.current_approval_stage,
         id
       ]
     );
