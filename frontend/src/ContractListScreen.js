@@ -52,6 +52,7 @@ import { useNavigate } from 'react-router-dom';
 import NewContractModal from './NewContractModal';
 import useDocumentPolling from './hooks/useDocumentPolling';
 import DocumentReviewPanel from './components/DocumentReviewPanel';
+import DocumentFieldReviewModal from './components/DocumentFieldReviewModal';
 
 const { Header, Content } = Layout;
 const { Option } = Select;
@@ -73,6 +74,8 @@ function ContractListScreen() {
   const [fileList, setFileList] = useState([]);
   const [reviewModalVisible, setReviewModalVisible] = useState(false);
   const [selectedDocumentForReview, setSelectedDocumentForReview] = useState(null);
+  const [fieldReviewModalVisible, setFieldReviewModalVisible] = useState(false);
+  const [selectedDocumentForFieldReview, setSelectedDocumentForFieldReview] = useState(null);
   const [editForm] = Form.useForm();
   const { user, token } = useAuth();
   const navigate = useNavigate();
@@ -234,6 +237,65 @@ function ContractListScreen() {
       setDocumentsLoading(false);
     }
   }, [token]);
+
+  // Handle field review for documents with low confidence
+  const handleFieldReview = async (document) => {
+    try {
+      setDocumentsLoading(true);
+      
+      // Fetch document with extracted fields
+      const response = await fetch(`http://localhost:3001/documents/${document.document_id}/fields`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch document fields');
+      }
+      
+      const documentWithFields = await response.json();
+      setSelectedDocumentForFieldReview(documentWithFields);
+      setFieldReviewModalVisible(true);
+      
+    } catch (error) {
+      console.error('Error fetching document fields:', error);
+      message.error('Failed to load document fields for review');
+    } finally {
+      setDocumentsLoading(false);
+    }
+  };
+
+  // Save field review results
+  const handleSaveFieldReview = async (reviewData) => {
+    try {
+      const response = await fetch(`http://localhost:3001/documents/${reviewData.document_id}/validate`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(reviewData)
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to save field review');
+      }
+      
+      // Refresh contract details to show updated document status
+      if (contractDetails) {
+        fetchContractDetails(contractDetails.contract_id);
+      }
+      
+      // Refresh contracts list
+      fetchContracts();
+      
+    } catch (error) {
+      console.error('Error saving field review:', error);
+      throw error;
+    }
+  };
 
   // Handle document upload for existing contract
   const handleDocumentUpload = async (fileItem) => {
@@ -551,11 +613,13 @@ function ContractListScreen() {
       title: 'Contract #',
       dataIndex: 'contractNumber',
       key: 'contractNumber',
+      width: 200,
       sorter: (a, b) => a.contractNumber.localeCompare(b.contractNumber),
       render: (text, record) => (
         <Button 
           type="link" 
           onClick={() => handleContractAction('view', record)}
+          style={{ padding: 0, height: 'auto', fontSize: '14px' }}
         >
           {text || 'N/A'}
         </Button>
@@ -565,33 +629,44 @@ function ContractListScreen() {
       title: 'Customer',
       dataIndex: 'customerName',
       key: 'customerName',
+      width: 200,
       sorter: (a, b) => a.customerName.localeCompare(b.customerName),
-      render: (text) => text || 'N/A'
+      render: (text) => (
+        <div style={{ wordBreak: 'break-word', whiteSpace: 'normal' }}>
+          {text || 'N/A'}
+        </div>
+      )
     },
     {
       title: 'Property Address',
       dataIndex: 'propertyAddress',
       key: 'propertyAddress',
+      width: 250,
       ellipsis: true,
-      render: (text) => text || 'N/A'
+      render: (text) => (
+        <div style={{ wordBreak: 'break-word', whiteSpace: 'normal' }}>
+          {text || 'N/A'}
+        </div>
+      )
     },
-    {
-      title: 'Loan Amount',
-      dataIndex: 'loanAmount',
-      key: 'loanAmount',
-      sorter: (a, b) => a.loanAmount - b.loanAmount,
-      render: (amount) => amount ? `$${amount.toLocaleString()}` : 'N/A'
-    },
-    {
-      title: 'Document Type',
-      dataIndex: 'documentType',
-      key: 'documentType',
-      render: (type) => type ? <Tag>{type}</Tag> : <Tag color="default">N/A</Tag>
-    },
+    // {
+    //   title: 'Loan Amount',
+    //   dataIndex: 'loanAmount',
+    //   key: 'loanAmount',
+    //   sorter: (a, b) => a.loanAmount - b.loanAmount,
+    //   render: (amount) => amount ? `$${amount.toLocaleString()}` : 'N/A'
+    // },
+    // {
+    //   title: 'Document Type',
+    //   dataIndex: 'documentType',
+    //   key: 'documentType',
+    //   render: (type) => type ? <Tag>{type}</Tag> : <Tag color="default">N/A</Tag>
+    // },
     {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
+      width: 120,
       filters: [
         { text: 'Draft', value: 'Draft' },
         { text: 'Under Review', value: 'Under Review' },
@@ -606,6 +681,7 @@ function ContractListScreen() {
       title: 'Progress',
       dataIndex: 'progress',
       key: 'progress',
+      width: 120,
       render: (progress) => (
         <Progress 
           percent={progress} 
@@ -618,12 +694,18 @@ function ContractListScreen() {
       title: 'Assigned To',
       dataIndex: 'assignedTo',
       key: 'assignedTo',
-      render: (text) => text || 'Unassigned'
+      width: 150,
+      render: (text) => (
+        <div style={{ wordBreak: 'break-word', whiteSpace: 'normal' }}>
+          {text || 'Unassigned'}
+        </div>
+      )
     },
     {
       title: 'Created Date',
       dataIndex: 'createdDate',
       key: 'createdDate',
+      width: 120,
       sorter: (a, b) => new Date(a.createdDate) - new Date(b.createdDate)
     },
     {
@@ -712,7 +794,7 @@ function ContractListScreen() {
               >
                 Refresh
               </Button>
-              <Button 
+              {/* <Button 
                 onClick={() => {
                   console.log('🔧 Debug info:', { 
                     user, 
@@ -735,7 +817,7 @@ function ContractListScreen() {
                 danger
               >
                 Force Re-login
-              </Button>
+              </Button> */}
               <Button 
                 type="primary" 
                 onClick={() => setNewContractModalVisible(true)}
@@ -750,6 +832,8 @@ function ContractListScreen() {
             dataSource={filteredContracts}
             loading={loading}
             rowKey="id"
+            scroll={{ x: true }}
+            tableLayout="fixed"
             pagination={{
               total: filteredContracts.length,
               pageSize: 10,
@@ -803,6 +887,10 @@ function ContractListScreen() {
           </Button>
         ]}
         width={700}
+        centered
+        maskClosable={false}
+        destroyOnClose={true}
+        zIndex={1000}
       >
         {selectedContract && (
           <div>
@@ -847,73 +935,92 @@ function ContractListScreen() {
                       size="small"
                       dataSource={contractDetails.documents}
                       renderItem={(doc) => (
-                        <List.Item
-                          actions={[
-                            doc.needs_manual_review && doc.status === 'Extracted' ? (
-                              <Button 
-                                type="primary" 
-                                size="small"
-                                danger
-                                onClick={() => {
-                                  setSelectedDocumentForReview(doc);
-                                  setReviewModalVisible(true);
-                                }}
-                              >
-                                Review
-                              </Button>
-                            ) : null,
-                            <Button 
-                              type="link" 
-                              size="small"
-                              icon={<EyeOutlined />}
-                              disabled={!doc.ss_uri}
-                              onClick={() => {
-                                if (doc.ss_uri) {
-                                  window.open(doc.ss_uri, '_blank');
-                                } else {
-                                  message.warning('Document file not available for viewing');
-                                }
-                              }}
-                            >
-                              {doc.ss_uri ? 'View' : 'N/A'}
-                            </Button>
-                          ].filter(Boolean)}
-                        >
-                          <List.Item.Meta
-                            avatar={<FileTextOutlined style={{ color: '#1890ff' }} />}
-                            title={doc.file_name}
-                            description={
-                              <Space direction="vertical" size={4}>
-                                <Space>
-                                  <Tag color="blue">{doc.document_type}</Tag>
-                                  {doc.status === 'Processing' && (
-                                    <Tag color="processing" icon={<SyncOutlined spin />}>
-                                      Processing...
-                                    </Tag>
-                                  )}
-                                  {doc.status === 'Extracted' && doc.confidence_score && (
-                                    <>
-                                      {doc.needs_manual_review ? (
-                                        <Tag color="warning">
-                                          Extracted ({doc.confidence_score.toFixed(1)}%) - Needs Review
-                                        </Tag>
-                                      ) : (
-                                        <Tag color="success">
-                                          Extracted ({doc.confidence_score.toFixed(1)}%)
+                        <List.Item style={{ paddingRight: '8px' }}>
+                          <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <List.Item.Meta
+                                avatar={<FileTextOutlined style={{ color: '#1890ff' }} />}
+                                title={<div style={{ marginBottom: '4px' }}>{doc.file_name}</div>}
+                                description={
+                                  <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
+                                      <Tag color="blue">{doc.document_type}</Tag>
+                                      {doc.status === 'Processing' && (
+                                        <Tag color="processing" icon={<SyncOutlined spin />}>
+                                          Processing...
                                         </Tag>
                                       )}
-                                    </>
-                                  )}
-                                  {doc.status === 'Uploaded' && (
-                                    <Tag color="default">Uploaded</Tag>
-                                  )}
-                                </Space>
-                                <Text type="secondary" style={{ fontSize: '12px' }}>
-                                  Uploaded: {new Date(doc.upload_date).toLocaleDateString()}
-                                </Text>
-                              </Space>
-                            }
-                          />
+                                      {(doc.status === 'Needs Review' || doc.needs_manual_review) && (
+                                        <Tag color="warning" icon={<EditOutlined />}>
+                                          {doc.confidence_score && typeof doc.confidence_score === 'number' 
+                                            ? `Confidence: ${doc.confidence_score.toFixed(1)}% - Review Required`
+                                            : 'Review Required'
+                                          }
+                                        </Tag>
+                                      )}
+                                      {(doc.status === 'Extracted' || doc.status === 'Validated') && !doc.needs_manual_review && (
+                                        <Tag color="success" icon={<CheckOutlined />}>
+                                          {doc.confidence_score && typeof doc.confidence_score === 'number' 
+                                            ? `Confidence: ${doc.confidence_score.toFixed(1)}% - Validated`
+                                            : 'Validated'
+                                          }
+                                        </Tag>
+                                      )}
+                                      {doc.status === 'Uploaded' && doc.confidence_score === null && (
+                                        <Tag color="orange" icon={<EditOutlined />}>
+                                          Manual Review Required
+                                        </Tag>
+                                      )}
+                                      {doc.status === 'Uploaded' && doc.confidence_score !== null && (
+                                        <Tag color="default">Uploaded</Tag>
+                                      )}
+                                    </div>
+                                    <Text type="secondary" style={{ fontSize: '12px' }}>
+                                      Uploaded: {new Date(doc.upload_date).toLocaleDateString()}
+                                    </Text>
+                                  </Space>
+                                }
+                              />
+                            </div>
+                            <div style={{ marginLeft: '16px', display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-end' }}>
+                              {(doc.needs_manual_review || doc.status === 'Needs Review' || (doc.confidence_score === null && doc.status !== 'Processing')) ? (
+                                <Button 
+                                  type="primary" 
+                                  size="small"
+                                  danger
+                                  icon={<EditOutlined />}
+                                  onClick={() => handleFieldReview(doc)}
+                                  loading={documentsLoading}
+                                >
+                                  {doc.confidence_score === null && doc.status !== 'Processing' ? 'Add Fields Manually' : 'Review Fields'}
+                                </Button>
+                              ) : (doc.status === 'Extracted' || doc.status === 'Validated') && !doc.needs_manual_review ? (
+                                <Button 
+                                  type="link" 
+                                  size="small"
+                                  icon={<CheckOutlined />}
+                                  style={{ color: '#52c41a' }}
+                                >
+                                  Validated
+                                </Button>
+                              ) : null}
+                              <Button 
+                                type="link" 
+                                size="small"
+                                icon={<EyeOutlined />}
+                                disabled={!doc.ss_uri}
+                                onClick={() => {
+                                  if (doc.ss_uri) {
+                                    window.open(doc.ss_uri, '_blank');
+                                  } else {
+                                    message.warning('Document file not available for viewing');
+                                  }
+                                }}
+                              >
+                                {doc.ss_uri ? 'View' : 'N/A'}
+                              </Button>
+                            </div>
+                          </div>
                         </List.Item>
                       )}
                     />
@@ -956,6 +1063,10 @@ function ContractListScreen() {
         }}
         footer={null}
         width={600}
+        centered
+        maskClosable={false}
+        destroyOnClose={true}
+        zIndex={1000}
       >
         <Form
           form={editForm}
@@ -1072,6 +1183,10 @@ function ContractListScreen() {
           </Button>
         ]}
         width={600}
+        centered
+        maskClosable={false}
+        destroyOnClose={true}
+        zIndex={1000}
       >
         {selectedContract && (
           <div>
@@ -1184,7 +1299,10 @@ function ContractListScreen() {
         }}
         footer={null}
         width={1200}
-        destroyOnClose
+        centered
+        maskClosable={false}
+        destroyOnClose={true}
+        zIndex={1000}
       >
         {selectedDocumentForReview && (
           <DocumentReviewPanel
@@ -1206,6 +1324,18 @@ function ContractListScreen() {
           />
         )}
       </Modal>
+
+      {/* Document Field Review Modal */}
+      <DocumentFieldReviewModal
+        visible={fieldReviewModalVisible}
+        onClose={() => {
+          setFieldReviewModalVisible(false);
+          setSelectedDocumentForFieldReview(null);
+        }}
+        document={selectedDocumentForFieldReview}
+        onSave={handleSaveFieldReview}
+        loading={documentsLoading}
+      />
     </Layout>
   );
 }

@@ -100,51 +100,130 @@ async function submitDocumentForOCR(fileBuffer, fileName, documentType, document
 function parseExtractionResult(fptaiResponse, documentType = 'ID Card') {
   try {
     console.log(`📋 Parsing FPT.AI response for ${documentType}...`);
+    console.log(`📋 Raw response:`, JSON.stringify(fptaiResponse, null, 2));
     
-    // FPT.AI returns data in different structures for ID vs Passport
-    // Common structure: { errorCode, errorMessage, data: [...] }
+    // FPT.AI returns data in different structures for different document types
+    // Common structure: { errorCode, errorMessage, data: [...], overall_score }
     
     if (fptaiResponse.errorCode && fptaiResponse.errorCode !== 0) {
       throw new Error(fptaiResponse.errorMessage || 'FPT.AI extraction error');
     }
 
-    // Extract data array from response
-    const extractedData = fptaiResponse.data || [];
+    // Extract overall confidence score
+    let confidenceScore = 0;
     
-    // Calculate average confidence from all fields
-    let totalConfidence = 0;
-    let fieldCount = 0;
-    
-    extractedData.forEach(item => {
-      if (item.confidence !== undefined) {
-        totalConfidence += parseFloat(item.confidence) * 100; // Convert to percentage
-        fieldCount++;
+    if (fptaiResponse.overall_score) {
+      // Use overall_score if available at root level (ID Card format)
+      confidenceScore = parseFloat(fptaiResponse.overall_score);
+    } else {
+      // Check if overall_score is in the data array (Passport format)
+      const extractedData = fptaiResponse.data || [];
+      if (extractedData.length > 0 && extractedData[0].overall_score) {
+        confidenceScore = parseFloat(extractedData[0].overall_score);
+      } else {
+        // Calculate average confidence from individual field probabilities
+        let totalConfidence = 0;
+        let fieldCount = 0;
+        
+        extractedData.forEach(item => {
+          // Look for probability fields (e.g., id_prob, name_prob, etc.)
+          Object.keys(item).forEach(key => {
+            if (key.endsWith('_prob') && item[key] && item[key] !== 'N/A') {
+              const probValue = parseFloat(item[key]);
+              if (!isNaN(probValue)) {
+                totalConfidence += probValue;
+                fieldCount++;
+              }
+            }
+          });
+        });
+        
+        confidenceScore = fieldCount > 0 ? totalConfidence / fieldCount : 0;
       }
-    });
-    
-    const confidenceScore = fieldCount > 0 ? totalConfidence / fieldCount : 0;
+    }
     
     // Determine if manual review is needed
     const needsManualReview = confidenceScore < FPTAI_CONFIG.confidenceThreshold;
 
-    // Format extracted fields into key-value pairs
-    const extractedFields = {};
+    // Format extracted fields into standardized format
+    const extractedFields = [];
+    const extractedData = fptaiResponse.data || [];
+    
     extractedData.forEach(item => {
-      if (item.name && item.value) {
-        extractedFields[item.name] = {
-          value: item.value,
-          confidence: parseFloat(item.confidence) * 100
-        };
+      // Extract common ID card fields
+      if (item.name) {
+        extractedFields.push({
+          field_name: 'Full Name',
+          field_value: item.name,
+          confidence_score: parseFloat(item.name_prob || 0)
+        });
+      }
+      
+      if (item.id) {
+        extractedFields.push({
+          field_name: 'ID Number',
+          field_value: item.id,
+          confidence_score: parseFloat(item.id_prob || 0)
+        });
+      }
+      
+      if (item.dob) {
+        extractedFields.push({
+          field_name: 'Date of Birth',
+          field_value: item.dob,
+          confidence_score: parseFloat(item.dob_prob || 0)
+        });
+      }
+      
+      if (item.sex) {
+        extractedFields.push({
+          field_name: 'Gender',
+          field_value: item.sex,
+          confidence_score: parseFloat(item.sex_prob || 0)
+        });
+      }
+      
+      if (item.nationality) {
+        extractedFields.push({
+          field_name: 'Nationality',
+          field_value: item.nationality,
+          confidence_score: parseFloat(item.nationality_prob || 0)
+        });
+      }
+      
+      if (item.home) {
+        extractedFields.push({
+          field_name: 'Place of Origin',
+          field_value: item.home,
+          confidence_score: parseFloat(item.home_prob || 0)
+        });
+      }
+      
+      if (item.address) {
+        extractedFields.push({
+          field_name: 'Address',
+          field_value: item.address,
+          confidence_score: parseFloat(item.address_prob || 0)
+        });
+      }
+      
+      if (item.doe) {
+        extractedFields.push({
+          field_name: 'Date of Expiry',
+          field_value: item.doe,
+          confidence_score: parseFloat(item.doe_prob || 0)
+        });
       }
     });
 
-    console.log(`✅ Parsing complete - Confidence: ${confidenceScore.toFixed(2)}%`);
+    console.log(`✅ Parsing complete - Overall Confidence: ${confidenceScore.toFixed(2)}%`);
+    console.log(`   Extracted ${extractedFields.length} fields`);
 
     return {
       success: true,
       confidenceScore: parseFloat(confidenceScore.toFixed(2)),
       needsManualReview,
-      extractedData: extractedFields,
+      extractedFields,
       rawResponse: fptaiResponse
     };
 
@@ -155,7 +234,7 @@ function parseExtractionResult(fptaiResponse, documentType = 'ID Card') {
       error: error.message,
       confidenceScore: 0,
       needsManualReview: true,
-      extractedData: {},
+      extractedFields: [],
       rawResponse: fptaiResponse
     };
   }
