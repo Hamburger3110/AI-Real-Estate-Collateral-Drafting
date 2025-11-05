@@ -8,6 +8,7 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const { createTables, runMigrations, seedDemoUsers, testConnection, createDocument, createActivityLog } = require('./db');
 const { router: eventsRouter, sendTextractComplete } = require('./events');
+const { processDocument, getAPIForDocumentType } = require('./services/document-processor');
 
 // Configure AWS with environment variables
 AWS.config.update({ 
@@ -30,6 +31,7 @@ app.use('/migrations', require('./routes/migrations'));
 app.use('/activity_logs', require('./routes/activityLogs'));
 app.use('/events', eventsRouter);
 app.use('/webhook', require('./routes/webhook'));
+app.use('/fptai', require('./routes/fptai'));
 
 // Health check endpoint
 app.get('/health', async (req, res) => {
@@ -97,7 +99,7 @@ initializeDatabase().catch(err => {
   console.log('🚀 Server continuing without database connection.');
 });
 
-// Enhanced file upload endpoint with S3 and database integration
+// Enhanced file upload endpoint with S3 and OCR integration
 app.post('/upload', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
@@ -105,14 +107,16 @@ app.post('/upload', upload.single('file'), async (req, res) => {
     }
 
     const { originalname, buffer, mimetype, size } = req.file;
-    const { document_type = 'Ownership', user_id = 1 } = req.body; // Default values for demo
+    const { document_type = 'ID Card', user_id = 1, contract_id = null } = req.body;
     
-    // Generate unique filename
+    // Generate unique filename with contract_id if provided
     const timestamp = Date.now();
     const sanitizedName = originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const s3Key = `documents/${timestamp}_${sanitizedName}`;
+    const s3Key = contract_id 
+      ? `documents/${contract_id}/${timestamp}_${sanitizedName}`
+      : `documents/${timestamp}_${sanitizedName}`;
     
-    console.log(`📤 Uploading ${originalname} to S3...`);
+    console.log(`📤 Uploading ${originalname} (${document_type}) to S3...`);
     
     // Upload to S3 (with fallback to demo mode)
     let s3Result;
@@ -120,7 +124,7 @@ app.post('/upload', upload.single('file'), async (req, res) => {
     
     try {
       const s3Params = {
-        Bucket: process.env.S3_BUCKET_NAME || 'ai-real-estate-documents',
+        Bucket: process.env.S3_BUCKET_NAME || 'document-upload-vp',
         Key: s3Key,
         Body: buffer,
         ContentType: mimetype,
@@ -128,7 +132,8 @@ app.post('/upload', upload.single('file'), async (req, res) => {
           'original-name': originalname,
           'upload-timestamp': timestamp.toString(),
           'document-type': document_type,
-          'file-size': size.toString()
+          'file-size': size.toString(),
+          'contract-id': contract_id ? contract_id.toString() : 'none'
         }
       };
 
@@ -139,7 +144,7 @@ app.post('/upload', upload.single('file'), async (req, res) => {
       if (s3Error.code === 'CredentialsError') {
         // Demo mode - simulate S3 upload
         console.log(`⚠️ AWS credentials not configured, running in DEMO mode`);
-        s3Location = `https://demo-bucket.s3.us-east-2.amazonaws.com/${s3Key}`;
+        s3Location = `https://document-upload-vp.s3.us-east-2.amazonaws.com/${s3Key}`;
         console.log(`🎭 Demo upload simulated: ${s3Location}`);
       } else {
         throw s3Error; // Re-throw other S3 errors
@@ -167,50 +172,109 @@ app.post('/upload', upload.single('file'), async (req, res) => {
       action_detail: `Uploaded document: ${originalname} (${(size / 1024 / 1024).toFixed(2)} MB)`
     });
 
-    // Start Textract job asynchronously (optional)
-    if (s3Result) { // Only run Textract if actual S3 upload succeeded
+    // Determine processing strategy based on document type
+    const apiType = getAPIForDocumentType(document_type);
+    console.log(`🔍 Document type "${document_type}" will be processed by: ${apiType}`);
+
+    // Process document based on API type
+    if (apiType === 'FPTAI') {
+      // FPT.AI processing (ID Card, Passport) - Immediate/Synchronous
+      console.log(`⚡ Processing ${document_type} with FPT.AI immediately...`);
+      
       try {
-        const textractParams = {
-          DocumentLocation: {
-            S3Object: {
-              Bucket: process.env.S3_BUCKET_NAME || 'ai-real-estate-documents',
-              Name: s3Key
+        const processingResult = await processDocument(
+          buffer,
+          originalname,
+          document_type,
+          dbResult.document_id
+        );
+
+        if (processingResult.success) {
+          // Return immediate results with extraction data
+          return res.status(201).json({
+            success: true,
+            message: 'File uploaded and extracted successfully',
+            data: {
+              document_id: dbResult.document_id,
+              file_name: originalname,
+              s3_url: s3Location,
+              s3_key: s3Key,
+              file_size: size,
+              document_type: document_type,
+              status: 'Extracted',
+              confidence_score: processingResult.confidenceScore,
+              needs_manual_review: processingResult.needsManualReview,
+              extracted_data: processingResult.extractedData,
+              upload_timestamp: new Date().toISOString()
             }
-          },
-          FeatureTypes: ['TABLES', 'FORMS'],
-          JobTag: `doc_${dbResult.document_id}`
-        };
-
-        if (mimetype === 'application/pdf' || mimetype.startsWith('image/')) {
-          console.log(`🔍 Starting Textract analysis for document ${dbResult.document_id}...`);
-          const textractResult = await textract.startDocumentAnalysis(textractParams).promise();
-          
-          // Update document with Textract job ID
-          // This would be handled by your documents route update function
-          console.log(`📋 Textract job started: ${textractResult.JobId}`);
+          });
+        } else {
+          // Processing failed, but upload succeeded
+          console.error(`⚠️ FPT.AI processing failed: ${processingResult.error}`);
+          return res.status(201).json({
+            success: true,
+            message: 'File uploaded but extraction failed',
+            data: {
+              document_id: dbResult.document_id,
+              file_name: originalname,
+              s3_url: s3Location,
+              s3_key: s3Key,
+              file_size: size,
+              document_type: document_type,
+              status: 'Uploaded',
+              extraction_error: processingResult.error,
+              upload_timestamp: new Date().toISOString()
+            }
+          });
         }
-      } catch (textractError) {
-        console.log(`⚠️ Textract job failed (non-critical): ${textractError.message}`);
+      } catch (processingError) {
+        console.error(`❌ Error during FPT.AI processing:`, processingError);
+        // Return upload success even if processing fails
+        return res.status(201).json({
+          success: true,
+          message: 'File uploaded but extraction encountered an error',
+          data: {
+            document_id: dbResult.document_id,
+            file_name: originalname,
+            s3_url: s3Location,
+            s3_key: s3Key,
+            file_size: size,
+            document_type: document_type,
+            status: 'Uploaded',
+            extraction_error: processingError.message,
+            upload_timestamp: new Date().toISOString()
+          }
+        });
       }
-    } else {
-      console.log(`🎭 Skipping Textract in demo mode`);
-    }
 
-    // Return success response
-    res.status(201).json({
-      success: true,
-      message: 'File uploaded successfully',
-      data: {
-        document_id: dbResult.document_id,
-        file_name: originalname,
-        s3_url: s3Location,
-        s3_key: s3Key,
-        file_size: size,
-        document_type: document_type,
-        status: 'Uploaded',
-        upload_timestamp: new Date().toISOString()
-      }
-    });
+    } else if (apiType === 'BEDROCK') {
+      // Bedrock processing (Legal/Business/Financial) - Asynchronous via Lambda
+      console.log(`⏳ ${document_type} will be processed asynchronously by Lambda/Bedrock`);
+      console.log(`📁 S3 path: ${s3Key} (will trigger Lambda via SQS)`);
+
+      // Return immediately with "Processing" status
+      // Lambda will be triggered by S3 event automatically
+      return res.status(201).json({
+        success: true,
+        message: 'File uploaded successfully. OCR processing in progress.',
+        data: {
+          document_id: dbResult.document_id,
+          file_name: originalname,
+          s3_url: s3Location,
+          s3_key: s3Key,
+          file_size: size,
+          document_type: document_type,
+          status: 'Processing',
+          processing_method: 'Lambda/Bedrock',
+          message: 'Document is being processed. You will be notified when complete.',
+          upload_timestamp: new Date().toISOString()
+        }
+      });
+
+    } else {
+      // Unknown document type - should not happen due to validation
+      throw new Error(`Unsupported document type: ${document_type}`);
+    }
 
   } catch (error) {
     console.error('❌ Upload error:', error);

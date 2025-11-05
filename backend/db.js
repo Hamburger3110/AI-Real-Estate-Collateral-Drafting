@@ -130,6 +130,71 @@ async function runMigrations() {
       }
     }
 
+    // Migration 5: Add OCR extraction tracking columns to documents table
+    if (currentVersion < 5) {
+      console.log('📦 Applying migration 5 - Adding OCR extraction tracking columns...');
+      
+      try {
+        // Add new columns for FPT.AI OCR tracking
+        await client.query(`
+          DO $$ 
+          BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='documents' AND column_name='confidence_score') THEN
+              ALTER TABLE documents ADD COLUMN confidence_score DECIMAL(5,2);
+            END IF;
+            
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='documents' AND column_name='needs_manual_review') THEN
+              ALTER TABLE documents ADD COLUMN needs_manual_review BOOLEAN DEFAULT FALSE;
+            END IF;
+            
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='documents' AND column_name='extraction_completed_at') THEN
+              ALTER TABLE documents ADD COLUMN extraction_completed_at TIMESTAMP;
+            END IF;
+          END $$;
+        `);
+        
+        await client.query('INSERT INTO schema_version (version) VALUES (5) ON CONFLICT (version) DO NOTHING');
+        console.log('✅ Migration 5 completed successfully - OCR tracking columns added');
+        
+      } catch (error) {
+        console.error('❌ Error in migration 5:', error.message);
+        throw error;
+      }
+    }
+
+    // Migration 6: Update document_type enum to support new document types
+    if (currentVersion < 6) {
+      console.log('📦 Applying migration 6 - Updating document type enum...');
+      
+      try {
+        // Drop existing check constraint
+        await client.query(`
+          ALTER TABLE documents 
+          DROP CONSTRAINT IF EXISTS documents_document_type_check;
+        `);
+        
+        // Add new check constraint with updated document types
+        await client.query(`
+          ALTER TABLE documents 
+          ADD CONSTRAINT documents_document_type_check 
+          CHECK (document_type IN (
+            'ID Card', 
+            'Passport', 
+            'Legal Registration', 
+            'Business Registration', 
+            'Financial Statement'
+          ));
+        `);
+        
+        await client.query('INSERT INTO schema_version (version) VALUES (6) ON CONFLICT (version) DO NOTHING');
+        console.log('✅ Migration 6 completed successfully - Document types updated');
+        
+      } catch (error) {
+        console.error('❌ Error in migration 6:', error.message);
+        throw error;
+      }
+    }
+
     console.log('✅ All migrations completed');
     
   } catch (error) {
@@ -156,14 +221,17 @@ async function createTables() {
         document_id SERIAL PRIMARY KEY,
         file_name VARCHAR(256),
         ss_uri TEXT NOT NULL,
-        document_type VARCHAR(100) CHECK (document_type IN ('Ownership', 'Business Registration', 'IDPassport')),
+        document_type VARCHAR(100) CHECK (document_type IN ('ID Card', 'Passport', 'Legal Registration', 'Business Registration', 'Financial Statement')),
         upload_user_id INT REFERENCES users(user_id),
         upload_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         status VARCHAR(50) CHECK (status IN ('Uploaded', 'Extracted', 'Validated', 'Approved', 'Rejected')),
         textract_job_id VARCHAR(255),
         ocr_extracted_json JSONB,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        contract_id INTEGER
+        contract_id INTEGER,
+        confidence_score DECIMAL(5,2),
+        needs_manual_review BOOLEAN DEFAULT FALSE,
+        extraction_completed_at TIMESTAMP
       );
       CREATE TABLE IF NOT EXISTS extracted_fields (
         field_id SERIAL PRIMARY KEY,
