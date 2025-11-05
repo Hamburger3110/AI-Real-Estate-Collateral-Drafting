@@ -88,30 +88,42 @@ fi
 # Set proper permissions for env file
 chmod 600 .env
 
-# Test database connection
-echo "🔍 Testing database connection..."
+# Run comprehensive database health check and migrations
+echo "🔍 Running database health check and migrations..."
 if node -e "
-const { Pool } = require('pg');
-const pool = new Pool({
-  user: 'postgres',
-  password: 'postgres',
-  host: 'ai-collateral.cp4kyq4yeu8e.us-east-2.rds.amazonaws.com',
-  database: 'hackathon',
-  port: 5432,
-});
-pool.query('SELECT NOW()', (err, res) => {
-  if (err) {
-    console.error('❌ Database connection failed:', err.message);
+require('dotenv').config();
+const { testConnection, runMigrations, seedDemoUsers } = require('./db');
+
+async function healthCheck() {
+  try {
+    console.log('🔗 Testing database connection...');
+    const connected = await testConnection();
+    
+    if (!connected) {
+      console.log('❌ Database connection failed');
+      process.exit(1);
+    }
+    
+    console.log('🔄 Running database migrations...');
+    await runMigrations();
+    
+    console.log('👥 Seeding demo users...');
+    await seedDemoUsers();
+    
+    console.log('✅ Database health check completed successfully!');
+    
+  } catch (error) {
+    console.error('❌ Health check failed:', error.message);
     process.exit(1);
-  } else {
-    console.log('✅ Database connection successful');
-    process.exit(0);
   }
-});
+  process.exit(0);
+}
+
+healthCheck();
 "; then
-    echo "✅ Database connection verified"
+    echo "✅ Database health check and migrations completed"
 else
-    echo "❌ Database connection failed. Please check your RDS configuration."
+    echo "❌ Database health check failed. Please check your RDS configuration."
     exit 1
 fi
 
