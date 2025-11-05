@@ -1,0 +1,38 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - echo Logging in to Amazon ECR...
+      - aws --version
+      - echo Build started on `date`
+      - echo Logging in to Amazon ECR...
+      
+  build:
+    commands:
+      - echo Build started on `date`
+      - echo Installing backend dependencies...
+      - cd backend
+      - npm ci --only=production
+      - echo Installing frontend dependencies...
+      - cd ../frontend
+      - npm ci
+      - echo Building frontend...
+      - npm run build
+      - cd ..
+      
+  post_build:
+    commands:
+      - echo Build completed on `date`
+      - echo Creating deployment package...
+      
+artifacts:
+  files:
+    - '**/*'
+  exclude-paths:
+    - 'frontend/node_modules/**/*'
+    - 'backend/node_modules/.cache/**/*'
+    - 'frontend/src/**/*'
+    - '.git/**/*'
+    - 'README.md'
+    - '.gitignore'
