@@ -167,7 +167,18 @@ async function runMigrations() {
       console.log('📦 Applying migration 6 - Updating document type enum...');
       
       try {
-        // Drop existing check constraint
+        // First, standardize existing document types to match the new constraint
+        await client.query(`
+          UPDATE documents SET document_type = CASE 
+            WHEN document_type = 'IDPassport' THEN 'ID Card'
+            WHEN document_type = 'Ownership' THEN 'Legal Registration'
+            WHEN document_type IN ('ID Card', 'Passport', 'Legal Registration', 'Business Registration', 'Financial Statement') THEN document_type
+            ELSE 'Legal Registration'  -- Default for any unexpected types
+          END
+          WHERE document_type IS NOT NULL;
+        `);
+        
+        // Drop existing check constraint if it exists
         await client.query(`
           ALTER TABLE documents 
           DROP CONSTRAINT IF EXISTS documents_document_type_check;
@@ -187,7 +198,7 @@ async function runMigrations() {
         `);
         
         await client.query('INSERT INTO schema_version (version) VALUES (6) ON CONFLICT (version) DO NOTHING');
-        console.log('✅ Migration 6 completed successfully - Document types updated');
+        console.log('✅ Migration 6 completed successfully - Document types updated and standardized');
         
       } catch (error) {
         console.error('❌ Error in migration 6:', error.message);
