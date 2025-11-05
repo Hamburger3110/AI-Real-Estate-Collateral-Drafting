@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Layout,
   Table,
@@ -21,7 +21,6 @@ import {
   Col,
   Typography,
   Descriptions,
-  Divider,
   Popconfirm,
   List,
   Spin,
@@ -45,16 +44,18 @@ import {
   CalendarOutlined,
   PlusOutlined,
   InboxOutlined,
-  DeleteOutlined
+  DeleteOutlined,
+  SyncOutlined
 } from '@ant-design/icons';
 import { useAuth } from './contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import NewContractModal from './NewContractModal';
+import useDocumentPolling from './hooks/useDocumentPolling';
+import DocumentReviewPanel from './components/DocumentReviewPanel';
 
 const { Header, Content } = Layout;
 const { Option } = Select;
-
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 function ContractListScreen() {
   const [contracts, setContracts] = useState([]);
@@ -70,12 +71,51 @@ function ContractListScreen() {
   const [addDocumentModalVisible, setAddDocumentModalVisible] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({});
   const [fileList, setFileList] = useState([]);
+  const [reviewModalVisible, setReviewModalVisible] = useState(false);
+  const [selectedDocumentForReview, setSelectedDocumentForReview] = useState(null);
   const [editForm] = Form.useForm();
   const { user, token } = useAuth();
   const navigate = useNavigate();
 
+  // Track all documents for polling (flatten from contract details)
+  const [allDocuments, setAllDocuments] = useState([]);
+
+  // Refs to avoid circular dependencies in useCallback
+  const fetchContractsRef = useRef(null);
+  const fetchContractDetailsRef = useRef(null);
+
+  // Callback when document status changes (from polling)
+  const handleDocumentStatusChange = useCallback((updatedDoc) => {
+    console.log('📢 Document status changed:', updatedDoc);
+    
+    // Show success notification
+    const reviewText = updatedDoc.needsManualReview 
+      ? ' - Manual review required' 
+      : '';
+    
+    notification.success({
+      message: 'Document Extraction Complete',
+      description: `${updatedDoc.fileName} has been processed. Confidence: ${updatedDoc.confidenceScore?.toFixed(1)}%${reviewText}`,
+      duration: 5
+    });
+
+    // Refresh contracts to get updated data
+    if (fetchContractsRef.current) {
+      fetchContractsRef.current();
+    }
+    
+    // If viewing contract details, refresh those too
+    if (viewModalVisible && selectedContract && fetchContractDetailsRef.current) {
+      fetchContractDetailsRef.current(selectedContract.id);
+    }
+  }, [viewModalVisible, selectedContract]);
+
+  // Use polling hook for processing documents
+  useDocumentPolling(allDocuments, handleDocumentStatusChange, 5000);
+
   // Fetch contracts from API
   const fetchContracts = useCallback(async () => {
+    fetchContractsRef.current = fetchContracts;
     console.log('🔍 Fetching contracts...', { 
       user: user ? `${user.full_name} (${user.role})` : 'not logged in', 
       token: token ? `exists (${token.substring(0, 20)}...)` : 'missing',
@@ -144,6 +184,7 @@ function ContractListScreen() {
 
   // Fetch detailed contract information including documents
   const fetchContractDetails = useCallback(async (contractId) => {
+    fetchContractDetailsRef.current = fetchContractDetails;
     setDocumentsLoading(true);
     try {
       const response = await fetch(`http://localhost:3001/contracts/${contractId}`, {
@@ -159,6 +200,28 @@ function ContractListScreen() {
 
       const data = await response.json();
       setContractDetails(data);
+      
+      // Update allDocuments for polling if any documents are processing
+      if (data.documents && Array.isArray(data.documents)) {
+        const processingDocs = data.documents
+          .filter(doc => doc.status === 'Processing')
+          .map(doc => ({
+            id: doc.document_id,
+            documentId: doc.document_id,
+            status: doc.status,
+            fileName: doc.file_name
+          }));
+        
+        if (processingDocs.length > 0) {
+          setAllDocuments(prev => {
+            // Merge with existing, avoiding duplicates
+            const existingIds = prev.map(d => d.id);
+            const newDocs = processingDocs.filter(d => !existingIds.includes(d.id));
+            return [...prev, ...newDocs];
+          });
+        }
+      }
+      
       return data;
     } catch (error) {
       console.error('Error fetching contract details:', error);
@@ -182,7 +245,7 @@ function ContractListScreen() {
     try {
       const formData = new FormData();
       formData.append('file', fileItem.file);
-      formData.append('document_type', fileItem.type || 'Ownership');
+      formData.append('document_type', fileItem.type || 'ID Card');
       formData.append('user_id', user.user_id);
 
       setUploadProgress(prev => ({ ...prev, [fileItem.uid]: 0 }));
@@ -786,6 +849,19 @@ function ContractListScreen() {
                       renderItem={(doc) => (
                         <List.Item
                           actions={[
+                            doc.needs_manual_review && doc.status === 'Extracted' ? (
+                              <Button 
+                                type="primary" 
+                                size="small"
+                                danger
+                                onClick={() => {
+                                  setSelectedDocumentForReview(doc);
+                                  setReviewModalVisible(true);
+                                }}
+                              >
+                                Review
+                              </Button>
+                            ) : null,
                             <Button 
                               type="link" 
                               size="small"
@@ -801,15 +877,38 @@ function ContractListScreen() {
                             >
                               {doc.ss_uri ? 'View' : 'N/A'}
                             </Button>
-                          ]}
+                          ].filter(Boolean)}
                         >
                           <List.Item.Meta
                             avatar={<FileTextOutlined style={{ color: '#1890ff' }} />}
                             title={doc.file_name}
                             description={
-                              <Space>
-                                <Tag color="blue">{doc.document_type}</Tag>
-                                <Text type="secondary">
+                              <Space direction="vertical" size={4}>
+                                <Space>
+                                  <Tag color="blue">{doc.document_type}</Tag>
+                                  {doc.status === 'Processing' && (
+                                    <Tag color="processing" icon={<SyncOutlined spin />}>
+                                      Processing...
+                                    </Tag>
+                                  )}
+                                  {doc.status === 'Extracted' && doc.confidence_score && (
+                                    <>
+                                      {doc.needs_manual_review ? (
+                                        <Tag color="warning">
+                                          Extracted ({doc.confidence_score.toFixed(1)}%) - Needs Review
+                                        </Tag>
+                                      ) : (
+                                        <Tag color="success">
+                                          Extracted ({doc.confidence_score.toFixed(1)}%)
+                                        </Tag>
+                                      )}
+                                    </>
+                                  )}
+                                  {doc.status === 'Uploaded' && (
+                                    <Tag color="default">Uploaded</Tag>
+                                  )}
+                                </Space>
+                                <Text type="secondary" style={{ fontSize: '12px' }}>
                                   Uploaded: {new Date(doc.upload_date).toLocaleDateString()}
                                 </Text>
                               </Space>
@@ -986,7 +1085,7 @@ function ContractListScreen() {
                   file,
                   status: 'ready',
                   uid: file.uid,
-                  type: 'Ownership' // default type
+                  type: 'ID Card' // default type
                 }]);
                 return false; // Prevent automatic upload
               }}
@@ -1037,10 +1136,11 @@ function ContractListScreen() {
                               size="small"
                               style={{ width: 200 }}
                             >
-                              <Select.Option value="Ownership">Property Ownership</Select.Option>
+                              <Select.Option value="ID Card">ID Card</Select.Option>
+                              <Select.Option value="Passport">Passport</Select.Option>
+                              <Select.Option value="Legal Registration">Legal Registration</Select.Option>
                               <Select.Option value="Business Registration">Business Registration</Select.Option>
-                              <Select.Option value="IDPassport">ID/Passport</Select.Option>
-                              <Select.Option value="Financial">Financial Documents</Select.Option>
+                              <Select.Option value="Financial Statement">Financial Statement</Select.Option>
                             </Select>
                             {item.status === 'uploading' && (
                               <Progress 
@@ -1073,6 +1173,39 @@ function ContractListScreen() {
           setNewContractModalVisible(false);
         }}
       />
+
+      {/* Document Review Modal */}
+      <Modal
+        title="Manual Document Review"
+        open={reviewModalVisible}
+        onCancel={() => {
+          setReviewModalVisible(false);
+          setSelectedDocumentForReview(null);
+        }}
+        footer={null}
+        width={1200}
+        destroyOnClose
+      >
+        {selectedDocumentForReview && (
+          <DocumentReviewPanel
+            document={selectedDocumentForReview}
+            token={token}
+            onSave={(correctedData) => {
+              message.success('Document corrections saved!');
+              setReviewModalVisible(false);
+              setSelectedDocumentForReview(null);
+              // Refresh contract details to show updated data
+              if (selectedContract) {
+                fetchContractDetails(selectedContract.id);
+              }
+            }}
+            onCancel={() => {
+              setReviewModalVisible(false);
+              setSelectedDocumentForReview(null);
+            }}
+          />
+        )}
+      </Modal>
     </Layout>
   );
 }

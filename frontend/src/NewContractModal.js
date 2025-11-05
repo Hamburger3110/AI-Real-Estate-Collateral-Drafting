@@ -15,7 +15,8 @@ import {
   message,
   Divider,
   Progress,
-  Tag
+  Tag,
+  Spin
 } from 'antd';
 import {
   InboxOutlined,
@@ -42,6 +43,7 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({});
   const [contractData, setContractData] = useState(null);
+  const [autoCreating, setAutoCreating] = useState(false);
   const { user, token } = useAuth();
 
   // Generate unique contract number
@@ -54,40 +56,77 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
     return `CT-${year}${month}${day}-${time}`;
   };
 
-  // Initialize form with auto-generated contract number
+  // Auto-create draft contract when modal opens
   React.useEffect(() => {
-    if (visible && contractForm) {
-      contractForm.setFieldsValue({
-        contract_number: generateContractNumber()
-      });
-    }
-  }, [visible, contractForm]);
+    const autoCreateDraftContract = async () => {
+      if (visible && !contractData && !autoCreating) {
+        setAutoCreating(true);
+        setLoading(true);
+        
+        try {
+          const contractNumber = generateContractNumber();
+          console.log('Auto-creating draft contract:', contractNumber);
+          
+          const response = await fetch('http://localhost:3001/contracts', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              contract_number: contractNumber,
+              customer_name: 'Draft Contract',
+              property_address: 'To be updated',
+              loan_amount: 0,
+              generated_by: user.user_id
+            })
+          });
+
+          if (!response.ok) {
+            throw new Error('Failed to create draft contract');
+          }
+
+          const contract = await response.json();
+          console.log('Draft contract created:', contract);
+          setContractData(contract);
+          
+          // Start at upload step (step 0 in new flow)
+          setCurrentStep(0);
+          
+          message.success('Contract created! Please upload documents.');
+        } catch (error) {
+          console.error('Error creating draft contract:', error);
+          message.error('Failed to create contract: ' + error.message);
+          onCancel(); // Close modal on error
+        } finally {
+          setLoading(false);
+          setAutoCreating(false);
+        }
+      }
+    };
+
+    autoCreateDraftContract();
+  }, [visible, contractData, autoCreating, token, user, onCancel]);
 
   const steps = [
     {
-      title: 'Contract Details',
-      content: 'Enter contract information',
-      icon: <FileTextOutlined />
-    },
-    {
       title: 'Upload Documents',
-      content: 'Attach supporting documents',
+      content: 'Upload and extract documents',
       icon: <InboxOutlined />
     },
     {
-      title: 'Review & Create',
-      content: 'Review and finalize contract',
+      title: 'Review & Complete',
+      content: 'Review uploaded documents',
       icon: <CheckCircleOutlined />
     }
   ];
 
   const documentTypes = [
-    { value: 'Ownership', label: 'Property Ownership Documents' },
+    { value: 'ID Card', label: 'ID Card' },
+    { value: 'Passport', label: 'Passport' },
+    { value: 'Legal Registration', label: 'Legal Registration' },
     { value: 'Business Registration', label: 'Business Registration' },
-    { value: 'IDPassport', label: 'ID/Passport' },
-    { value: 'Financial', label: 'Financial Documents' },
-    { value: 'Insurance', label: 'Insurance Documents' },
-    { value: 'Other', label: 'Other Documents' }
+    { value: 'Financial Statement', label: 'Financial Statement' }
   ];
 
   const handleContractSubmit = async (values) => {
@@ -151,7 +190,7 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
         file, 
         status: 'ready', 
         uid: file.uid,
-        type: 'Ownership' // default type
+        type: 'ID Card' // default type
       }]);
       return false; // Prevent automatic upload
     },
@@ -179,7 +218,7 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
         
         const formData = new FormData();
         formData.append('file', fileItem.file);
-        formData.append('document_type', fileItem.type || 'Ownership');
+        formData.append('document_type', fileItem.type || 'ID Card');
         formData.append('user_id', user.user_id);
 
         setUploadProgress(prev => ({ ...prev, [fileItem.uid]: 0 }));
@@ -237,7 +276,25 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
                 : item
             ));
             
-            message.success(`${fileItem.file.name} uploaded and linked successfully!`);
+            // Show appropriate message based on extraction results
+            if (result.status === 'Extracted') {
+              if (result.needs_manual_review) {
+                message.warning({
+                  content: `${fileItem.file.name} uploaded and extracted (Confidence: ${result.confidence_score?.toFixed(1)}%). Manual review required.`,
+                  duration: 5
+                });
+              } else {
+                message.success({
+                  content: `${fileItem.file.name} uploaded and extracted successfully (Confidence: ${result.confidence_score?.toFixed(1)}%)!`,
+                  duration: 5
+                });
+              }
+            } else if (result.status === 'Processing') {
+              message.info(`${fileItem.file.name} uploaded. OCR processing in progress...`);
+            } else {
+              message.success(`${fileItem.file.name} uploaded and linked successfully!`);
+            }
+            
             resolve(result);
           } catch (parseError) {
             console.error('Error parsing upload response:', parseError);
@@ -392,6 +449,7 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
     setFileList([]);
     setUploadedDocuments([]);
     setUploadProgress({});
+    setAutoCreating(false);
     contractForm.resetFields();
     documentForm.resetFields();
     onCancel();
@@ -554,10 +612,9 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
       )}
 
       <Space>
-        <Button onClick={() => setCurrentStep(0)}>Back to Contract Details</Button>
         <Button 
           type="primary" 
-          onClick={() => setCurrentStep(2)}
+          onClick={() => setCurrentStep(1)}
           disabled={uploadedDocuments.filter(doc => doc.document_id).length === 0}
         >
           {uploadedDocuments.filter(doc => doc.document_id).length === 0 
@@ -584,22 +641,116 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
         )}
       </Card>
 
-      <Card title="Attached Documents" style={{ marginBottom: 16 }}>
+      <Card title="Document Extraction Results" style={{ marginBottom: 16 }}>
         {uploadedDocuments.filter(doc => doc.document_id).length > 0 ? (
           <>
             <List
               dataSource={uploadedDocuments.filter(doc => doc.document_id)}
               renderItem={(item) => (
-                <List.Item>
+                <List.Item
+                  style={{
+                    border: item.needs_manual_review ? '1px solid #faad14' : '1px solid #d9d9d9',
+                    padding: 16,
+                    marginBottom: 12,
+                    borderRadius: 8,
+                    backgroundColor: item.needs_manual_review ? '#fffbf0' : '#ffffff'
+                  }}
+                >
                   <List.Item.Meta
-                    avatar={<CheckCircleOutlined style={{ fontSize: 24, color: '#52c41a' }} />}
-                    title={item.name}
-                    description={
-                      <Space>
-                        <Tag>{item.type}</Tag>
-                        <Tag color="green">Successfully Linked</Tag>
-                        <Text type="secondary">ID: {item.document_id}</Text>
+                    avatar={
+                      item.needs_manual_review ? (
+                        <CheckCircleOutlined style={{ fontSize: 24, color: '#faad14' }} />
+                      ) : (
+                        <CheckCircleOutlined style={{ fontSize: 24, color: '#52c41a' }} />
+                      )
+                    }
+                    title={
+                      <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                        <Text strong>{item.name}</Text>
+                        <Space>
+                          <Tag color="blue">{item.type}</Tag>
+                          {item.status === 'Extracted' && item.confidence_score !== undefined && (
+                            <>
+                              {item.needs_manual_review ? (
+                                <Tag color="warning" icon={<CheckCircleOutlined />}>
+                                  Extracted - Confidence: {item.confidence_score?.toFixed(1)}%
+                                </Tag>
+                              ) : (
+                                <Tag color="success" icon={<CheckCircleOutlined />}>
+                                  Extracted - Confidence: {item.confidence_score?.toFixed(1)}%
+                                </Tag>
+                              )}
+                            </>
+                          )}
+                          {item.status === 'Processing' && (
+                            <Tag color="processing">Processing...</Tag>
+                          )}
+                          {!item.status || item.status === 'Uploaded' && (
+                            <Tag color="default">Uploaded</Tag>
+                          )}
+                        </Space>
                       </Space>
+                    }
+                    description={
+                      <div style={{ marginTop: 8 }}>
+                        {item.needs_manual_review && (
+                          <div style={{ 
+                            padding: 8, 
+                            backgroundColor: '#fff7e6', 
+                            border: '1px solid #ffd591',
+                            borderRadius: 4,
+                            marginBottom: 8
+                          }}>
+                            <Text type="warning" strong>⚠️ Manual Review Required</Text>
+                            <br />
+                            <Text type="secondary" style={{ fontSize: '12px' }}>
+                              Confidence score is below 95%. Please review extracted information after completing contract creation.
+                            </Text>
+                          </div>
+                        )}
+                        
+                        {item.extracted_data && Object.keys(item.extracted_data).length > 0 && (
+                          <div style={{ marginTop: 8 }}>
+                            <Text strong style={{ fontSize: '12px' }}>Extracted Information:</Text>
+                            <div style={{ 
+                              marginTop: 4, 
+                              padding: 8, 
+                              backgroundColor: '#f5f5f5',
+                              borderRadius: 4,
+                              fontSize: '12px'
+                            }}>
+                              {Object.entries(item.extracted_data).slice(0, 5).map(([key, value]) => {
+                                const displayValue = typeof value === 'object' ? value.value : value;
+                                return (
+                                  <div key={key} style={{ marginBottom: 4 }}>
+                                    <Text type="secondary">{key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}:</Text>{' '}
+                                    <Text>{displayValue || 'N/A'}</Text>
+                                  </div>
+                                );
+                              })}
+                              {Object.keys(item.extracted_data).length > 5 && (
+                                <Text type="secondary" style={{ fontStyle: 'italic' }}>
+                                  ... and {Object.keys(item.extracted_data).length - 5} more fields
+                                </Text>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {item.status === 'Extracted' && !item.needs_manual_review && (
+                          <div style={{ 
+                            marginTop: 8,
+                            padding: 8, 
+                            backgroundColor: '#f6ffed', 
+                            border: '1px solid #b7eb8f',
+                            borderRadius: 4
+                          }}>
+                            <Text type="success" style={{ fontSize: '12px' }}>
+                              ✅ High confidence extraction - No manual review required
+                            </Text>
+                          </div>
+                        )}
+                      </div>
                     }
                   />
                 </List.Item>
@@ -607,8 +758,16 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
             />
             <div style={{ marginTop: 16, padding: 12, backgroundColor: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 6 }}>
               <Text type="success">
-                ✅ {uploadedDocuments.filter(doc => doc.document_id).length} document(s) successfully attached to this contract
+                ✅ {uploadedDocuments.filter(doc => doc.document_id).length} document(s) successfully processed
               </Text>
+              {uploadedDocuments.some(doc => doc.needs_manual_review) && (
+                <>
+                  <br />
+                  <Text type="warning">
+                    ⚠️ {uploadedDocuments.filter(doc => doc.needs_manual_review).length} document(s) require manual review
+                  </Text>
+                </>
+              )}
             </div>
           </>
         ) : (
@@ -625,7 +784,7 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
       </Card>
 
       <Space>
-        <Button onClick={() => setCurrentStep(1)}>Back to Documents</Button>
+        <Button onClick={() => setCurrentStep(0)}>Back to Documents</Button>
         <Button 
           type="primary" 
           onClick={handleFinish}
@@ -661,9 +820,17 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
       </Steps>
 
       <div style={{ minHeight: 400 }}>
-        {currentStep === 0 && renderContractForm()}
-        {currentStep === 1 && renderDocumentUpload()}
-        {currentStep === 2 && renderReview()}
+        {loading && !contractData ? (
+          <div style={{ textAlign: 'center', padding: '50px' }}>
+            <Spin size="large" />
+            <p style={{ marginTop: 16 }}>Creating contract...</p>
+          </div>
+        ) : (
+          <>
+            {currentStep === 0 && renderDocumentUpload()}
+            {currentStep === 1 && renderReview()}
+          </>
+        )}
       </div>
     </Modal>
   );

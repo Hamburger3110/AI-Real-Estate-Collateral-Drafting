@@ -106,7 +106,7 @@ function DocumentUploadScreen() {
         
         const formData = new FormData();
         formData.append('file', file);
-        formData.append('document_type', form.getFieldValue('document_type') || 'Ownership');
+        formData.append('document_type', form.getFieldValue('document_type') || 'ID Card');
         formData.append('user_id', user?.id || 1);
         
         console.log(`📤 Uploading file ${i + 1}/${fileList.length}: ${file.name}`);
@@ -270,15 +270,15 @@ function DocumentUploadScreen() {
                 <Form.Item
                   label="Document Type"
                   name="document_type"
-                  initialValue="Ownership"
+                  initialValue="ID Card"
                   rules={[{ required: true, message: 'Please select document type' }]}
                 >
                   <Select placeholder="Select document type">
-                    <Select.Option value="Ownership">Property Ownership Document</Select.Option>
+                    <Select.Option value="ID Card">ID Card</Select.Option>
+                    <Select.Option value="Passport">Passport</Select.Option>
+                    <Select.Option value="Legal Registration">Legal Registration</Select.Option>
                     <Select.Option value="Business Registration">Business Registration</Select.Option>
-                    <Select.Option value="IDPassport">ID/Passport</Select.Option>
-                    <Select.Option value="Financial">Financial Statement</Select.Option>
-                    <Select.Option value="Legal">Legal Document</Select.Option>
+                    <Select.Option value="Financial Statement">Financial Statement</Select.Option>
                   </Select>
                 </Form.Item>
               </Form>
