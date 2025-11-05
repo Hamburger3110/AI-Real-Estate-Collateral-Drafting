@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:14-alpine
+    container_name: ai-real-estate-db
+    environment:
+      POSTGRES_DB: ${PGDATABASE:-ai_real_estate}
+      POSTGRES_USER: ${PGUSER:-postgres}
+      POSTGRES_PASSWORD: ${PGPASSWORD:-password123}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - ai-real-estate-network
+    restart: unless-stopped
+
+  # Redis for session storage (optional)
+  redis:
+    image: redis:7-alpine
+    container_name: ai-real-estate-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - ai-real-estate-network
+    restart: unless-stopped
+
+  # Application
+  app:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    container_name: ai-real-estate-app
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - PGHOST=postgres
+      - PGPORT=5432
+      - PGDATABASE=${PGDATABASE:-ai_real_estate}
+      - PGUSER=${PGUSER:-postgres}
+      - PGPASSWORD=${PGPASSWORD:-password123}
+      - AWS_REGION=${AWS_REGION:-us-east-2}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME}
+      - JWT_SECRET=${JWT_SECRET:-your-super-secure-jwt-secret}
+    ports:
+      - "3001:3001"
+    depends_on:
+      - postgres
+    networks:
+      - ai-real-estate-network
+    restart: unless-stopped
+    volumes:
+      - app_uploads:/app/backend/uploads
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: ai-real-estate-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - ../frontend/build:/usr/share/nginx/html:ro
+    depends_on:
+      - app
+    networks:
+      - ai-real-estate-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  app_uploads:
+    driver: local
+
+networks:
+  ai-real-estate-network:
+    driver: bridge
