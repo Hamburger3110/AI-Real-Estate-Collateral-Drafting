@@ -199,6 +199,10 @@ function DocumentUploadScreen() {
             <BellOutlined style={{ color: 'white', fontSize: '18px' }} />
           </Badge>
           <Avatar icon={<UserOutlined />} />
+          <span style={{ color: 'white' }}>{user?.full_name || user?.email || 'User'}</span>
+          <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>
+            ({user?.role || 'N/A'})
+          </span>
         </Space>
       </Header>
       

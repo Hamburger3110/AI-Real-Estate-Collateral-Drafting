@@ -5,6 +5,7 @@ import './App.css';
 import 'antd/dist/reset.css';
 
 import { AuthProvider } from './contexts/AuthContext';
+import { NotificationProvider } from './contexts/NotificationContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import LoginScreen from './LoginScreen';
 import DocumentUploadScreen from './DocumentUploadScreen';
@@ -17,8 +18,9 @@ import ApprovalWorkflowScreen from './ApprovalWorkflowScreen';
 function App() {
   return (
     <AuthProvider>
-      <Router>
-        <div className="App">
+      <NotificationProvider>
+        <Router>
+          <div className="App">
           <Routes>
             <Route path="/login" element={<LoginScreen />} />
             <Route 
@@ -77,6 +79,7 @@ function App() {
           </Routes>
         </div>
       </Router>
+      </NotificationProvider>
     </AuthProvider>
   );
 }

@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from "react";
 import {
-  Layout,
   Card,
   Steps,
   Button,
@@ -17,8 +16,8 @@ import {
   Statistic,
   Avatar,
   Divider,
-  Alert
-} from 'antd';
+  Alert,
+} from "antd";
 import {
   CheckOutlined,
   CloseOutlined,
@@ -28,12 +27,13 @@ import {
   SafetyOutlined,
   BankOutlined,
   CrownOutlined,
-  LoadingOutlined
-} from '@ant-design/icons';
-import { useAuth } from './contexts/AuthContext';
-import { useParams, useNavigate } from 'react-router-dom';
+  LoadingOutlined,
+} from "@ant-design/icons";
+import { useAuth } from "./contexts/AuthContext";
+import { useParams, useNavigate } from "react-router-dom";
+import { formatLocalDate, formatLocalDateTime } from "./utils/timeUtils";
+import AppLayout from "./components/AppLayout";
 
-const { Content } = Layout;
 const { Title, Text, Paragraph } = Typography;
 const { Step } = Steps;
 const { TextArea } = Input;
@@ -46,22 +46,25 @@ function ApprovalWorkflowScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [currentAction, setCurrentAction] = useState(null);
   const [form] = Form.useForm();
-  
+
   const { token } = useAuth();
   const { contractId } = useParams();
   const navigate = useNavigate();
 
   const fetchWorkflow = useCallback(async () => {
     if (!contractId || !token) return;
-    
+
     setLoading(true);
     try {
-      const response = await fetch(`http://localhost:3001/approvals/contract/${contractId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+      const response = await fetch(
+        `http://localhost:3001/approvals/contract/${contractId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
         }
-      });
+      );
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -71,10 +74,10 @@ function ApprovalWorkflowScreen() {
       setWorkflow(data.workflow);
       setContract(data.contract);
     } catch (error) {
-      console.error('Error fetching workflow:', error);
+      console.error("Error fetching workflow:", error);
       notification.error({
-        message: 'Error',
-        description: 'Failed to fetch approval workflow'
+        message: "Error",
+        description: "Failed to fetch approval workflow",
       });
     } finally {
       setLoading(false);
@@ -95,35 +98,37 @@ function ApprovalWorkflowScreen() {
 
     setActionLoading(true);
     try {
-      const response = await fetch(`http://localhost:3001/approvals/contract/${contractId}/stage/${currentAction.stage}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          action: currentAction.action,
-          comments: values.comments
-        })
-      });
+      const response = await fetch(
+        `http://localhost:3001/approvals/contract/${contractId}/stage/${currentAction.stage}`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            action: currentAction.action,
+            comments: values.comments,
+          }),
+        }
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Action failed');
+        throw new Error(errorData.error || "Action failed");
       }
 
       const result = await response.json();
-      
+
       message.success(result.message);
       setModalVisible(false);
       form.resetFields();
       await fetchWorkflow(); // Refresh the workflow
-
     } catch (error) {
-      console.error('Error submitting action:', error);
+      console.error("Error submitting action:", error);
       notification.error({
-        message: 'Error',
-        description: error.message
+        message: "Error",
+        description: error.message,
       });
     } finally {
       setActionLoading(false);
@@ -132,183 +137,230 @@ function ApprovalWorkflowScreen() {
 
   const getStageIcon = (stage) => {
     const icons = {
-      'document_review': <FileTextOutlined />,
-      'credit_analysis': <BankOutlined />,
-      'legal_review': <SafetyOutlined />,
-      'risk_assessment': <ClockCircleOutlined />,
-      'final_approval': <CrownOutlined />
+      document_review: <FileTextOutlined />,
+      credit_analysis: <BankOutlined />,
+      legal_review: <SafetyOutlined />,
+      risk_assessment: <ClockCircleOutlined />,
+      final_approval: <CrownOutlined />,
     };
     return icons[stage] || <FileTextOutlined />;
   };
 
   const getProgressPercent = () => {
     if (!workflow) return 0;
-    const completedStages = workflow.filter(stage => stage.status === 'approved').length;
+    const completedStages = workflow.filter(
+      (stage) => stage.status === "approved"
+    ).length;
     return Math.round((completedStages / workflow.length) * 100);
   };
 
   if (loading) {
     return (
-      <Layout style={{ minHeight: '100vh' }}>
-        <Content style={{ padding: '24px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+      // <AppLayout>
+        <div
+          style={{
+            padding: "24px",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
           <LoadingOutlined style={{ fontSize: 48 }} />
-        </Content>
-      </Layout>
+        </div>
+      // </AppLayout>
     );
   }
 
   if (!contract || !workflow) {
     return (
-      <Layout style={{ minHeight: '100vh' }}>
-        <Content style={{ padding: '24px' }}>
+      // <AppLayout>
+        <div
+          style={{
+            padding: "24px",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
           <Alert
             message="Contract Not Found"
             description="The requested contract could not be found."
             type="error"
             showIcon
             action={
-              <Button size="small" onClick={() => navigate('/contracts')}>
+              <Button size="small" onClick={() => navigate("/contracts")}>
                 Back to Contracts
               </Button>
             }
           />
-        </Content>
-      </Layout>
+        </div>
+      // </AppLayout>
     );
   }
 
   return (
-    <Layout style={{ minHeight: '100vh', background: '#f0f2f5' }}>
-      <Content style={{ padding: '24px' }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-          {/* Header */}
-          <Card style={{ marginBottom: '24px' }}>
-            <Row align="middle" justify="space-between">
-              <Col>
-                <Title level={2} style={{ margin: 0 }}>
-                  Contract Approval Workflow
-                </Title>
-                <Text type="secondary">Contract: {contract.contract_number}</Text>
-              </Col>
-              <Col>
-                <Button onClick={() => navigate('/contracts')}>
-                  Back to Contracts
-                </Button>
-              </Col>
-            </Row>
-          </Card>
+    <React.Fragment>
+      <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
+        {/* Header */}
+        <Card style={{ marginBottom: "24px" }}>
+          <Row align="middle" justify="space-between">
+            <Col>
+              <Title level={2} style={{ margin: 0 }}>
+                Contract Approval Workflow
+              </Title>
+              <Text type="secondary">Contract: {contract.contract_number}</Text>
+            </Col>
+            <Col>
+              <Button onClick={() => navigate("/contracts")}>
+                Back to Contracts
+              </Button>
+            </Col>
+          </Row>
+        </Card>
 
-          <Row gutter={24}>
-            {/* Contract Details */}
-            <Col xs={24} lg={8}>
-              <Card title="Contract Details" style={{ marginBottom: '24px' }}>
-                <Space direction="vertical" style={{ width: '100%' }}>
-                  <div>
-                    <Text strong>Customer:</Text>
-                    <br />
-                    <Text>{contract.customer_name}</Text>
-                  </div>
-                  <div>
-                    <Text strong>Property:</Text>
-                    <br />
-                    <Text>{contract.property_address}</Text>
-                  </div>
-                  <div>
-                    <Text strong>Loan Amount:</Text>
-                    <br />
-                    <Text>${parseFloat(contract.loan_amount).toLocaleString()}</Text>
-                  </div>
-                  <div>
-                    <Text strong>Created By:</Text>
-                    <br />
-                    <Text>{contract.generated_by_name}</Text>
-                  </div>
-                  <div>
-                    <Text strong>Created:</Text>
-                    <br />
-                    <Text>{new Date(contract.generated_at).toLocaleDateString()}</Text>
-                  </div>
-                  <div>
-                    <Text strong>Priority:</Text>
-                    <br />
-                    <Tag color={contract.priority === 'high' ? 'red' : contract.priority === 'medium' ? 'orange' : 'green'}>
-                      {contract.priority?.toUpperCase() || 'MEDIUM'}
-                    </Tag>
-                  </div>
-                </Space>
-              </Card>
-
-              <Card title="Progress Overview">
-                <Statistic
-                  title="Overall Progress"
-                  value={getProgressPercent()}
-                  suffix="%"
-                  valueStyle={{ color: getProgressPercent() === 100 ? '#3f8600' : '#1890ff' }}
-                />
-                <Divider />
+        <Row gutter={24}>
+          {/* Contract Details */}
+          <Col xs={24} lg={8}>
+            <Card title="Contract Details" style={{ marginBottom: "24px" }}>
+              <Space direction="vertical" style={{ width: "100%" }}>
                 <div>
-                  <Text strong>Current Status:</Text>
+                  <Text strong>Customer:</Text>
                   <br />
-                  <Tag color={contract.status === 'approved' ? 'green' : contract.status === 'rejected' ? 'red' : 'blue'}>
-                    {contract.status?.toUpperCase()}
+                  <Text>{contract.customer_name}</Text>
+                </div>
+                <div>
+                  <Text strong>Property:</Text>
+                  <br />
+                  <Text>{contract.property_address}</Text>
+                </div>
+                <div>
+                  <Text strong>Loan Amount:</Text>
+                  <br />
+                  <Text>
+                    ${parseFloat(contract.loan_amount).toLocaleString()}
+                  </Text>
+                </div>
+                <div>
+                  <Text strong>Created By:</Text>
+                  <br />
+                  <Text>{contract.generated_by_name}</Text>
+                </div>
+                <div>
+                  <Text strong>Created:</Text>
+                  <br />
+                  <Text>{formatLocalDate(contract.generated_at)}</Text>
+                </div>
+                <div>
+                  <Text strong>Priority:</Text>
+                  <br />
+                  <Tag
+                    color={
+                      contract.priority === "high"
+                        ? "red"
+                        : contract.priority === "medium"
+                        ? "orange"
+                        : "green"
+                    }
+                  >
+                    {contract.priority?.toUpperCase() || "MEDIUM"}
                   </Tag>
                 </div>
-              </Card>
-            </Col>
+              </Space>
+            </Card>
 
-            {/* Workflow Steps */}
-            <Col xs={24} lg={16}>
-              <Card title="Approval Workflow">
-                <Steps
-                  direction="vertical"
-                  current={workflow.findIndex(stage => stage.isActive)}
-                  status={contract.status === 'rejected' ? 'error' : 'process'}
+            <Card title="Progress Overview">
+              <Statistic
+                title="Overall Progress"
+                value={getProgressPercent()}
+                suffix="%"
+                valueStyle={{
+                  color: getProgressPercent() === 100 ? "#3f8600" : "#1890ff",
+                }}
+              />
+              <Divider />
+              <div>
+                <Text strong>Current Status:</Text>
+                <br />
+                <Tag
+                  color={
+                    contract.status === "approved"
+                      ? "green"
+                      : contract.status === "rejected"
+                      ? "red"
+                      : "blue"
+                  }
                 >
-                  {workflow.map((stage, index) => (
-                    <Step
-                      key={stage.stage}
-                      title={stage.stageName}
-                      icon={getStageIcon(stage.stage)}
-                      status={
-                        stage.status === 'approved' ? 'finish' :
-                        stage.status === 'rejected' ? 'error' :
-                        stage.isActive ? 'process' : 'wait'
-                      }
-                      description={
-                        <div>
-                          {stage.approver && (
-                            <div style={{ marginBottom: '8px' }}>
-                              <Avatar size="small" icon={<UserOutlined />} style={{ marginRight: '8px' }} />
-                              <Text>{stage.approver.name}</Text>
-                              <Tag size="small" style={{ marginLeft: '8px' }}>
-                                {stage.approver.role}
-                              </Tag>
-                            </div>
-                          )}
-                          
-                          {stage.comments && (
-                            <Paragraph 
-                              type="secondary" 
-                              style={{ fontSize: '12px', margin: '4px 0' }}
-                            >
-                              "{stage.comments}"
-                            </Paragraph>
-                          )}
-                          
-                          {stage.approvedAt && (
-                            <Text type="secondary" style={{ fontSize: '12px' }}>
-                              {new Date(stage.approvedAt).toLocaleString()}
-                            </Text>
-                          )}
+                  {contract.status?.toUpperCase()}
+                </Tag>
+              </div>
+            </Card>
+          </Col>
 
-                          {stage.isActive && stage.canApprove && stage.status === 'pending' && (
-                            <div style={{ marginTop: '12px' }}>
+          {/* Workflow Steps */}
+          <Col xs={24} lg={16}>
+            <Card title="Approval Workflow">
+              <Steps
+                direction="vertical"
+                current={workflow.findIndex((stage) => stage.isActive)}
+                status={contract.status === "rejected" ? "error" : "process"}
+              >
+                {workflow.map((stage, index) => (
+                  <Step
+                    key={stage.stage}
+                    title={stage.stageName}
+                    icon={getStageIcon(stage.stage)}
+                    status={
+                      stage.status === "approved"
+                        ? "finish"
+                        : stage.status === "rejected"
+                        ? "error"
+                        : stage.isActive
+                        ? "process"
+                        : "wait"
+                    }
+                    description={
+                      <div>
+                        {stage.approver && (
+                          <div style={{ marginBottom: "8px" }}>
+                            <Avatar
+                              size="small"
+                              icon={<UserOutlined />}
+                              style={{ marginRight: "8px" }}
+                            />
+                            <Text>{stage.approver.name}</Text>
+                            <Tag size="small" style={{ marginLeft: "8px" }}>
+                              {stage.approver.role}
+                            </Tag>
+                          </div>
+                        )}
+
+                        {stage.comments && (
+                          <Paragraph
+                            type="secondary"
+                            style={{ fontSize: "12px", margin: "4px 0" }}
+                          >
+                            "{stage.comments}"
+                          </Paragraph>
+                        )}
+
+                        {stage.approvedAt && (
+                          <Text type="secondary" style={{ fontSize: "12px" }}>
+                            {formatLocalDateTime(stage.approvedAt)}
+                          </Text>
+                        )}
+
+                        {stage.isActive &&
+                          stage.canApprove &&
+                          stage.status === "pending" && (
+                            <div style={{ marginTop: "12px" }}>
                               <Space>
                                 <Button
                                   type="primary"
                                   size="small"
                                   icon={<CheckOutlined />}
-                                  onClick={() => handleAction('approve', stage.stage)}
+                                  onClick={() =>
+                                    handleAction("approve", stage.stage)
+                                  }
                                 >
                                   Approve
                                 </Button>
@@ -316,7 +368,9 @@ function ApprovalWorkflowScreen() {
                                   danger
                                   size="small"
                                   icon={<CloseOutlined />}
-                                  onClick={() => handleAction('reject', stage.stage)}
+                                  onClick={() =>
+                                    handleAction("reject", stage.stage)
+                                  }
                                 >
                                   Reject
                                 </Button>
@@ -324,66 +378,82 @@ function ApprovalWorkflowScreen() {
                             </div>
                           )}
 
-                          {stage.isActive && !stage.canApprove && stage.status === 'pending' && (
+                        {stage.isActive &&
+                          !stage.canApprove &&
+                          stage.status === "pending" && (
                             <Alert
                               message="Waiting for approval"
-                              description={`This stage requires ${stage.stage.includes('legal') ? 'Legal Officer' : stage.stage.includes('credit') ? 'Credit Officer' : 'Manager'} approval`}
+                              description={`This stage requires ${
+                                stage.stage.includes("legal")
+                                  ? "Legal Officer"
+                                  : stage.stage.includes("credit")
+                                  ? "Credit Officer"
+                                  : "Manager"
+                              } approval`}
                               type="info"
                               size="small"
-                              style={{ marginTop: '8px' }}
+                              style={{ marginTop: "8px" }}
                             />
                           )}
-                        </div>
-                      }
-                    />
-                  ))}
-                </Steps>
-              </Card>
-            </Col>
-          </Row>
-        </div>
+                      </div>
+                    }
+                  />
+                ))}
+              </Steps>
+            </Card>
+          </Col>
+        </Row>
+      </div>
 
-        {/* Action Modal */}
-        <Modal
-          title={`${currentAction?.action === 'approve' ? 'Approve' : 'Reject'} Stage`}
-          open={modalVisible}
-          onCancel={() => {
-            setModalVisible(false);
-            form.resetFields();
-          }}
-          footer={null}
-        >
-          <Form form={form} onFinish={submitAction} layout="vertical">
-            <Form.Item
-              name="comments"
-              label="Comments"
-              rules={[{ required: true, message: 'Please provide comments for your decision' }]}
-            >
-              <TextArea
-                rows={4}
-                placeholder={`Please provide your reasoning for ${currentAction?.action === 'approve' ? 'approving' : 'rejecting'} this stage...`}
-              />
-            </Form.Item>
-            
-            <Form.Item style={{ textAlign: 'right', marginBottom: 0 }}>
-              <Space>
-                <Button onClick={() => setModalVisible(false)}>
-                  Cancel
-                </Button>
-                <Button
-                  type={currentAction?.action === 'approve' ? 'primary' : 'default'}
-                  danger={currentAction?.action === 'reject'}
-                  htmlType="submit"
-                  loading={actionLoading}
-                >
-                  {currentAction?.action === 'approve' ? 'Approve' : 'Reject'}
-                </Button>
-              </Space>
-            </Form.Item>
-          </Form>
-        </Modal>
-      </Content>
-    </Layout>
+      {/* Action Modal */}
+      <Modal
+        title={`${
+          currentAction?.action === "approve" ? "Approve" : "Reject"
+        } Stage`}
+        open={modalVisible}
+        onCancel={() => {
+          setModalVisible(false);
+          form.resetFields();
+        }}
+        footer={null}
+      >
+        <Form form={form} onFinish={submitAction} layout="vertical">
+          <Form.Item
+            name="comments"
+            label="Comments"
+            rules={[
+              {
+                required: true,
+                message: "Please provide comments for your decision",
+              },
+            ]}
+          >
+            <TextArea
+              rows={4}
+              placeholder={`Please provide your reasoning for ${
+                currentAction?.action === "approve" ? "approving" : "rejecting"
+              } this stage...`}
+            />
+          </Form.Item>
+
+          <Form.Item style={{ textAlign: "right", marginBottom: 0 }}>
+            <Space>
+              <Button onClick={() => setModalVisible(false)}>Cancel</Button>
+              <Button
+                type={
+                  currentAction?.action === "approve" ? "primary" : "default"
+                }
+                danger={currentAction?.action === "reject"}
+                htmlType="submit"
+                loading={actionLoading}
+              >
+                {currentAction?.action === "approve" ? "Approve" : "Reject"}
+              </Button>
+            </Space>
+          </Form.Item>
+        </Form>
+      </Modal>
+    </React.Fragment>
   );
 }
 
