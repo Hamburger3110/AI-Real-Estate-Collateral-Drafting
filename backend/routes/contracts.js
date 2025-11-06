@@ -286,5 +286,287 @@ router.delete('/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// Contract Generation Endpoints
+
+// Get contract generation preview - shows mapped fields and readiness
+router.get('/:id/generation-preview', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const contractGenerator = require('../services/contract-generator');
+  
+  try {
+    console.log(`📋 Getting generation preview for contract ${id}`);
+    
+    const preview = await contractGenerator.getGenerationPreview(parseInt(id), pool);
+    
+    if (!preview.success) {
+      return res.status(400).json({ 
+        error: preview.error,
+        contractId: id 
+      });
+    }
+    
+    res.json({
+      success: true,
+      contractId: id,
+      preview: {
+        mappedFields: preview.mappedFields,
+        templateData: preview.templateData,
+        validation: preview.validation,
+        stats: preview.stats
+      }
+    });
+    
+  } catch (error) {
+    console.error(`❌ Error getting generation preview for contract ${id}:`, error);
+    res.status(500).json({ 
+      error: 'Failed to get contract generation preview',
+      details: error.message 
+    });
+  }
+});
+
+// Generate contract document from extracted fields
+router.post('/:id/generate', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const { userInputFields = {} } = req.body;
+  const contractGenerator = require('../services/contract-generator');
+  
+  try {
+    console.log(`📄 Generating contract document for contract ${id}`);
+    
+    const result = await contractGenerator.generateContract(parseInt(id), pool, userInputFields);
+    
+    if (!result.success) {
+      return res.status(400).json({ 
+        error: result.error,
+        contractId: id 
+      });
+    }
+    
+    // Set headers for file download
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+    res.setHeader('Content-Length', result.buffer.length);
+    
+    // Send the generated document
+    res.send(result.buffer);
+    
+  } catch (error) {
+    console.error(`❌ Error generating contract for contract ${id}:`, error);
+    res.status(500).json({ 
+      error: 'Failed to generate contract document',
+      details: error.message 
+    });
+  }
+});
+
+// Get field mapping for a contract - useful for manual field editing
+router.get('/:id/field-mapping', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const { mapContractFields } = require('../services/field-mapper');
+  
+  try {
+    console.log(`📋 Getting field mapping for contract ${id}`);
+    
+    const mappingResult = await mapContractFields(parseInt(id), pool);
+    
+    if (!mappingResult.success) {
+      return res.status(400).json({ 
+        error: mappingResult.error,
+        contractId: id 
+      });
+    }
+    
+    res.json({
+      success: true,
+      contractId: id,
+      mapping: {
+        fields: mappingResult.mappedFields,
+        stats: {
+          totalFields: mappingResult.totalFields,
+          filledFields: mappingResult.filledFields,
+          completionPercentage: mappingResult.completionPercentage,
+          documentsProcessed: mappingResult.documentsProcessed
+        }
+      }
+    });
+    
+  } catch (error) {
+    console.error(`❌ Error getting field mapping for contract ${id}:`, error);
+    res.status(500).json({ 
+      error: 'Failed to get contract field mapping',
+      details: error.message 
+    });
+  }
+});
+
+// Contract Document Access Endpoints
+
+/**
+ * Stream contract document directly from S3
+ * GET /contracts/:contractId/document/:type
+ * type: 'pdf' or 'docx'
+ */
+router.get('/:contractId/document/:type', authenticateToken, async (req, res) => {
+  const { contractId, type } = req.params;
+  const AWS = require('aws-sdk');
+  
+  try {
+    // Validate type
+    if (!['pdf', 'docx'].includes(type)) {
+      return res.status(400).json({ error: 'Invalid document type. Must be pdf or docx' });
+    }
+    
+    // Get contract from database
+    const contractResult = await pool.query(`
+      SELECT 
+        contract_id,
+        contract_number,
+        generated_pot_uri as pdf_url,
+        generated_docx_uri as docx_url,
+        status
+      FROM contracts 
+      WHERE contract_id = $1
+    `, [contractId]);
+    
+    if (contractResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Contract not found' });
+    }
+    
+    const contract = contractResult.rows[0];
+    
+    // Check if contract has been generated
+    if (contract.status !== 'generated' && contract.status !== 'approved') {
+      return res.status(400).json({ error: 'Contract has not been generated yet' });
+    }
+    
+    // Get the appropriate URL
+    const documentUrl = type === 'pdf' ? contract.pdf_url : contract.docx_url;
+    
+    if (!documentUrl) {
+      return res.status(404).json({ error: `${type.toUpperCase()} document not found for this contract` });
+    }
+    
+    // Extract S3 key from URL
+    let s3Key;
+    try {
+      const url = new URL(documentUrl);
+      if (url.hostname.includes('.s3.')) {
+        // Format: https://bucket-name.s3.region.amazonaws.com/key
+        s3Key = url.pathname.substring(1); // Remove leading slash
+      } else if (url.hostname.startsWith('s3.')) {
+        // Format: https://s3.region.amazonaws.com/bucket-name/key
+        const pathParts = url.pathname.substring(1).split('/');
+        s3Key = pathParts.slice(1).join('/'); // Remove bucket name, keep the rest
+      } else {
+        throw new Error('Unknown S3 URL format');
+      }
+    } catch (error) {
+      console.error('Failed to parse S3 URL:', documentUrl, error);
+      return res.status(500).json({ error: 'Invalid document URL format' });
+    }
+    
+    // Stream file directly from S3
+    const s3 = new AWS.S3({
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+      region: process.env.AWS_REGION
+    });
+    
+    const s3Params = {
+      Bucket: 'document-upload-vp',
+      Key: s3Key
+    };
+    
+    // Get object metadata first to set proper headers
+    const headResult = await s3.headObject(s3Params).promise();
+    
+    // Set appropriate headers
+    res.setHeader('Content-Type', headResult.ContentType || (type === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'));
+    res.setHeader('Content-Length', headResult.ContentLength);
+    res.setHeader('Content-Disposition', `inline; filename="${contract.contract_number}_${type}.${type}"`);
+    res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+    res.setHeader('Expires', '-1');
+    res.setHeader('Pragma', 'no-cache');
+    
+    // Stream the file
+    const s3Stream = s3.getObject(s3Params).createReadStream();
+    
+    s3Stream.on('error', (error) => {
+      console.error('S3 stream error:', error);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Failed to stream document' });
+      }
+    });
+    
+    s3Stream.pipe(res);
+    
+    console.log(`✅ Streaming document for contract ${contractId} ${type}: ${s3Key}`);
+    
+  } catch (error) {
+    console.error('Error streaming document:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+});
+
+/**
+ * Get contract document URLs (direct streaming endpoints)
+ * GET /contracts/:contractId/documents
+ */
+router.get('/:contractId/documents', authenticateToken, async (req, res) => {
+  const { contractId } = req.params;
+  
+  try {
+    // Get contract from database
+    const contractResult = await pool.query(`
+      SELECT 
+        contract_id,
+        contract_number,
+        generated_pot_uri as pdf_url,
+        generated_docx_uri as docx_url,
+        status
+      FROM contracts 
+      WHERE contract_id = $1
+    `, [contractId]);
+    
+    if (contractResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Contract not found' });
+    }
+    
+    const contract = contractResult.rows[0];
+    
+    // Check if contract has been generated
+    if (!contract.pdf_url && !contract.docx_url) {
+      return res.status(400).json({ error: 'Contract has not been generated yet' });
+    }
+    
+    const result = {
+      success: true,
+      contractId,
+      contractNumber: contract.contract_number,
+      documents: {}
+    };
+    
+    // Generate direct streaming URLs for available documents
+    const baseUrl = `${req.protocol}://${req.get('host')}/contracts/${contractId}/document`;
+    
+    if (contract.pdf_url) {
+      result.documents.pdf_url = `${baseUrl}/pdf`;
+    }
+    
+    if (contract.docx_url) {
+      result.documents.docx_url = `${baseUrl}/docx`;
+    }
+    
+    console.log(`✅ Generated streaming URLs for contract ${contractId}`);
+    res.json(result);
+    
+  } catch (error) {
+    console.error('Error generating streaming URLs:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
 module.exports = router;

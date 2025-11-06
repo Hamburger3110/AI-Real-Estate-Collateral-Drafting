@@ -1,0 +1,103 @@
+CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM
+Độc lập - Tự do - Hạnh phúc
+
+═══════════════════════════════════════════════════════════════════════════════
+
+HỢP ĐỒNG TÍN DỤNG
+
+═══════════════════════════════════════════════════════════════════════════════
+
+Số hợp đồng: {doc_number}
+Ngày ký: {doc_signing_date}
+Nơi ký: {doc_signing_location_office}
+
+Căn cứ Luật Các tổ chức tín dụng số 47/2010/QH12 và các văn bản hướng dẫn thi hành;
+Căn cứ nhu cầu và khả năng của các bên;
+Hai bên thống nhất ký kết hợp đồng tín dụng với các điều khoản sau:
+
+═══════════════════════════════════════════════════════════════════════════════
+ĐIỀU 1: THÔNG TIN CÁC BÊN THAM GIA HỢP ĐỒNG
+═══════════════════════════════════════════════════════════════════════════════
+
+1.1. BÊN CHO VAY (Ngân hàng):
+    Tên ngân hàng: {branch_name}
+    Địa chỉ: {branch_address}
+    Mã số thuế: {branch_bizregcode}
+    Số điện thoại: {branch_phone_number}
+    Đại diện pháp luật: {branch_representative_name}
+    Chức vụ: {branch_representative_title}
+
+1.2. BÊN VAY (Khách hàng):
+    Họ và tên: {lender_name}
+    Số CMND/CCCD: {lender_id_number}
+    Ngày cấp: {lender_id_issue_date}
+    Nơi cấp: {lender_id_issuer}
+    Địa chỉ thường trú: {lender_address_original}
+
+═══════════════════════════════════════════════════════════════════════════════
+ĐIỀU 2: THÔNG TIN TÀI SẢN ĐẢM BẢO
+═══════════════════════════════════════════════════════════════════════════════
+
+2.1. THÔNG TIN TÀI SẢN:
+    Địa chỉ tài sản: {prop_address}
+    Diện tích: {prop_area} m²
+    Mục đích sử dụng: {prop_purpose}
+    Nguồn gốc sử dụng đất: {prop_origin}
+    Giá trị định giá: {prop_value}
+
+2.2. GIẤY CHỨNG NHẬN QUYỀN SỬ DỤNG ĐẤT:
+    Số giấy chứng nhận: {prop_certID}
+    Cơ quan cấp: {prop_cert_issuer}
+    Ngày cấp: {prop_cert_issue_date}
+    Chủ sở hữu theo GCN: {prop_cert_owner}
+
+═══════════════════════════════════════════════════════════════════════════════
+ĐIỀU 3: THÔNG TIN KHOẢN VAY
+═══════════════════════════════════════════════════════════════════════════════
+
+3.1. SỐ TIỀN VAY:
+    Số tiền: {loan_amount_formatted}
+    Viết bằng chữ: {loan_amount_words}
+
+3.2. MỤC ĐÍCH VAY:
+    Phục vụ nhu cầu kinh doanh và tiêu dùng cá nhân hợp pháp
+
+═══════════════════════════════════════════════════════════════════════════════
+ĐIỀU 4: ĐIỀU KHOẢN VÀ ĐIỀU KIỆN
+═══════════════════════════════════════════════════════════════════════════════
+
+4.1. Bên vay cam kết sử dụng khoản vay đúng mục đích đã thỏa thuận
+4.2. Bên vay cam kết trả đủ, trả đúng hạn các khoản nợ theo hợp đồng
+4.3. Tài sản đảm bảo phải được bảo hiểm theo quy định
+4.4. Bên vay không được chuyển nhượng, thế chấp tài sản đảm bảo cho bên thứ ba
+
+═══════════════════════════════════════════════════════════════════════════════
+ĐIỀU 5: QUYỀN VÀ NGHĨA VỤ CỦA CÁC BÊN
+═══════════════════════════════════════════════════════════════════════════════
+
+5.1. QUYỀN VÀ NGHĨA VỤ CỦA BÊN CHO VAY:
+    - Giải ngân khoản vay theo đúng thỏa thuận
+    - Kiểm tra, giám sát việc sử dụng vốn vay
+    - Thu hồi nợ đúng hạn
+
+5.2. QUYỀN VÀ NGHĨA VỤ CỦA BÊN VAY:
+    - Được sử dụng khoản vay theo đúng mục đích
+    - Trả nợ đầy đủ, đúng hạn
+    - Chịu trách nhiệm trước pháp luật về tính chính xác của thông tin
+
+═══════════════════════════════════════════════════════════════════════════════
+ĐIỀU 6: HIỆU LỰC HỢP ĐỒNG
+═══════════════════════════════════════════════════════════════════════════════
+
+Hợp đồng này có hiệu lực kể từ ngày ký và được lập thành 02 bản có giá trị pháp lý như nhau, mỗi bên giữ 01 bản.
+
+Ngày tạo hợp đồng: {generation_date}
+
+          BÊN VAY                                    BÊN CHO VAY
+      (ký, ghi rõ họ tên)                       (ký, đóng dấu)
+
+
+      {lender_name}                              {branch_name}
+
+
+═══════════════════════════════════════════════════════════════════════════════

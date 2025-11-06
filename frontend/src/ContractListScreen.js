@@ -54,6 +54,7 @@ import useDocumentPolling from "./hooks/useDocumentPolling";
 import DocumentReviewPanel from "./components/DocumentReviewPanel";
 import DocumentFieldReviewModal from "./components/DocumentFieldReviewModal";
 import { formatLocalDate } from "./utils/timeUtils";
+import { getContractProgress } from "./utils/progressUtils";
 
 const { Option } = Select;
 const { Text } = Typography;
@@ -211,6 +212,7 @@ function ContractListScreen() {
       fetchContractDetailsRef.current = fetchContractDetails;
       setDocumentsLoading(true);
       try {
+        // Fetch contract details
         const response = await fetch(
           `http://localhost:3001/contracts/${contractId}`,
           {
@@ -228,6 +230,40 @@ function ContractListScreen() {
         }
 
         const data = await response.json();
+        
+        // Fetch workflow data for accurate progress calculation
+        try {
+          const workflowResponse = await fetch(
+            `http://localhost:3001/approvals/${contractId}`,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+              },
+            }
+          );
+          
+          if (workflowResponse.ok) {
+            const workflowData = await workflowResponse.json();
+            // Update the selected contract with accurate progress based on workflow
+            if (selectedContract && selectedContract.id == contractId) {
+              const accurateProgress = calculateProgress(
+                selectedContract.rawStatus, 
+                selectedContract.approvedAt, 
+                workflowData.workflow
+              );
+              setSelectedContract(prev => ({
+                ...prev,
+                progress: accurateProgress,
+                workflow: workflowData.workflow
+              }));
+            }
+          }
+        } catch (workflowError) {
+          console.log("Could not fetch workflow data for progress calculation:", workflowError);
+          // Continue without workflow data - progress will use status-based calculation
+        }
+        
         setContractDetails(data);
 
         // Update allDocuments for polling if any documents are processing
@@ -457,15 +493,9 @@ function ContractListScreen() {
     return statusMap[dbStatus] || dbStatus;
   };
 
-  const calculateProgress = (status, approvedAt) => {
-    const progressMap = {
-      started: 25,
-      processing: 50,
-      approved: 100,
-      rejected: 0,
-      pending_documents: 15,
-    };
-    return progressMap[status] || 0;
+  const calculateProgress = (status, approvedAt, workflow = null) => {
+    // Use workflow-based calculation if available, otherwise fall back to status-based
+    return getContractProgress(workflow, status, approvedAt);
   };
 
   const getStatusColor = (status) => {
@@ -946,6 +976,16 @@ function ContractListScreen() {
             }}
           >
             Add Document
+          </Button>,
+          <Button
+            key="generate"
+            icon={<FileTextOutlined />}
+            onClick={() => {
+              setViewModalVisible(false);
+              navigate(`/contracts/${selectedContract?.id}/generate`);
+            }}
+          >
+            Generate Contract
           </Button>,
           <Button
             key="workflow"

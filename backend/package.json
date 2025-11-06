@@ -15,12 +15,19 @@
     "aws-sdk": "^2.1692.0",
     "axios": "^1.6.0",
     "cors": "^2.8.5",
+    "docx": "^9.5.1",
+    "docxtemplater": "^3.67.3",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "form-data": "^4.0.0",
+    "html-pdf-node": "^1.0.8",
     "jsonwebtoken": "^9.0.2",
+    "mammoth": "^1.11.0",
     "multer": "^2.0.2",
-    "pg": "^8.16.3"
+    "officegen": "^0.6.5",
+    "pdf-lib": "^1.17.1",
+    "pg": "^8.16.3",
+    "pizzip": "^3.2.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"

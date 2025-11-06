@@ -12,6 +12,7 @@ import DocumentUploadScreen from './DocumentUploadScreen';
 import ContractListScreen from './ContractListScreen';
 import MultiStepApprovalScreen from './MultiStepApprovalScreen';
 import ContractReviewScreen from './ContractReviewScreen';
+import ContractGenerationScreen from './ContractGenerationScreen';
 import ApprovalDashboard from './ApprovalDashboard';
 import ApprovalWorkflowScreen from './ApprovalWorkflowScreen';
 
@@ -64,6 +65,14 @@ function App() {
               element={
                 <ProtectedRoute requiredPermissions={['VIEW_CONTRACTS']}>
                   <ApprovalWorkflowScreen />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/contracts/:contractId/generate" 
+              element={
+                <ProtectedRoute requiredPermissions={['VIEW_CONTRACTS']}>
+                  <ContractGenerationScreen />
                 </ProtectedRoute>
               } 
             />
