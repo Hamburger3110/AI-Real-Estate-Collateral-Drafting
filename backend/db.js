@@ -305,10 +305,32 @@ async function createTables() {
         log_id SERIAL PRIMARY KEY,
         user_id INT REFERENCES users(user_id),
         document_id INT REFERENCES documents(document_id),
+        contract_id INT REFERENCES contracts(contract_id),
         action VARCHAR(100),
         action_detail TEXT,
+        ip_address VARCHAR(45),
+        user_agent TEXT,
         timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+      
+      -- Add contract_id column if it doesn't exist (for existing installations)
+      DO $$ 
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                      WHERE table_name = 'activity_logs' AND column_name = 'contract_id') THEN
+          ALTER TABLE activity_logs ADD COLUMN contract_id INT REFERENCES contracts(contract_id);
+        END IF;
+        
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                      WHERE table_name = 'activity_logs' AND column_name = 'ip_address') THEN
+          ALTER TABLE activity_logs ADD COLUMN ip_address VARCHAR(45);
+        END IF;
+        
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                      WHERE table_name = 'activity_logs' AND column_name = 'user_agent') THEN
+          ALTER TABLE activity_logs ADD COLUMN user_agent TEXT;
+        END IF;
+      END $$;
     `);
   } finally {
     client.release();
@@ -390,8 +412,18 @@ async function createActivityLog(data) {
   const client = await pool.connect();
   try {
     const result = await client.query(
-      'INSERT INTO activity_logs (user_id, document_id, action, action_detail) VALUES ($1, $2, $3, $4) RETURNING *',
-      [data.user_id, data.document_id, data.action, data.action_detail]
+      `INSERT INTO activity_logs 
+       (user_id, document_id, contract_id, action, action_detail, ip_address, user_agent) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [
+        data.user_id, 
+        data.document_id || null, 
+        data.contract_id || null, 
+        data.action, 
+        data.action_detail || '', 
+        data.ip_address || null, 
+        data.user_agent || null
+      ]
     );
     return result.rows[0];
   } finally {

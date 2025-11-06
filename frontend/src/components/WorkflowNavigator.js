@@ -96,7 +96,7 @@ function WorkflowNavigator() {
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <Header style={{ 
-        background: 'linear-gradient(135deg, #1890ff 0%, #096dd9 100%)', 
+        background: 'linear-gradient(135deg, #1B5E20 0%, #2E7D32 100%)', 
         padding: '0 24px',
         display: 'flex',
         justifyContent: 'space-between',

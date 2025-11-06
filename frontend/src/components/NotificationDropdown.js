@@ -68,7 +68,7 @@ const NotificationDropdown = () => {
         return <CheckOutlined style={{ color: '#52c41a' }} />;
       case NOTIFICATION_TYPES.SYSTEM_ALERT:
       default:
-        return <InfoCircleOutlined style={{ color: '#1890ff' }} />;
+        return <InfoCircleOutlined style={{ color: '#1B5E20' }} />;
     }
   };
 
@@ -79,7 +79,7 @@ const NotificationDropdown = () => {
       case NOTIFICATION_PRIORITY.HIGH:
         return '#fa8c16';
       case NOTIFICATION_PRIORITY.MEDIUM:
-        return '#1890ff';
+        return '#1B5E20';
       case NOTIFICATION_PRIORITY.LOW:
       default:
         return '#52c41a';
@@ -201,7 +201,7 @@ const NotificationDropdown = () => {
         <Badge count={unreadCount} size="small">
           <BellOutlined 
             style={{ 
-              color: '#1890ff', 
+              color: '#1B5E20', 
               fontSize: '18px',
               cursor: 'pointer'
             }} 

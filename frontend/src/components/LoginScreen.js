@@ -17,7 +17,7 @@ import {
   LoginOutlined,
   SafetyOutlined
 } from '@ant-design/icons';
-import { useAuth } from './contexts/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 const { Title, Text } = Typography;
@@ -96,7 +96,7 @@ function LoginScreen() {
         <Col xs={24} lg={12}>
           <Card style={{ height: '100%' }}>
             <div style={{ textAlign: 'center', marginBottom: 32 }}>
-              <SafetyOutlined style={{ fontSize: 48, color: '#1890ff', marginBottom: 16 }} />
+              <SafetyOutlined style={{ fontSize: 48, color: '#1B5E20', marginBottom: 16 }} />
               <Title level={2}>VPBank Real Estate System</Title>
               <Text type="secondary">
                 AI-Powered Collateral Drafting & Document Management

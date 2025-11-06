@@ -212,7 +212,7 @@ function MultiStepApprovalScreen() {
               <Col span={12}>
                 <Card size="small" title="Debt-to-Income Ratio">
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '48px', fontWeight: 'bold', color: '#1890ff' }}>28%</div>
+                    <div style={{ fontSize: '48px', fontWeight: 'bold', color: '#1B5E20' }}>28%</div>
                     <Text type="secondary">Good</Text>
                   </div>
                 </Card>
@@ -296,7 +296,7 @@ function MultiStepApprovalScreen() {
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <Header style={{ 
-        background: 'linear-gradient(135deg, #1890ff 0%, #096dd9 100%)', 
+        background: 'linear-gradient(135deg, #1B5E20 0%, #2E7D32 100%)', 
         padding: '0 24px',
         display: 'flex',
         justifyContent: 'space-between',

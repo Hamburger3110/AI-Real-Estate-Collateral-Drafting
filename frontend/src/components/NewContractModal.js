@@ -27,7 +27,7 @@ import {
   EditOutlined,
   ReloadOutlined
 } from '@ant-design/icons';
-import { useAuth } from './contexts/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 
 const { Dragger } = Upload;
 const { Text } = Typography;
@@ -746,7 +746,7 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
                 }}
                 title={
                   <Space>
-                    <FileTextOutlined style={{ color: '#1890ff' }} />
+                    <FileTextOutlined style={{ color: '#1B5E20' }} />
                     <Text strong>{item.name}</Text>
                     <Tag color="blue">{item.type}</Tag>
                     {(() => {
@@ -889,7 +889,7 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
                                 </Text>
                                 <Text style={{ flex: 1, textAlign: 'right' }}>
                                   {editedValue !== undefined ? (
-                                    <span style={{ color: '#1890ff', fontWeight: 'bold' }}>
+                                    <span style={{ color: '#1B5E20', fontWeight: 'bold' }}>
                                       {editedValue} <Tag size="small" color="blue">edited</Tag>
                                     </span>
                                   ) : (

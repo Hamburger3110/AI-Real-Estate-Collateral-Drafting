@@ -29,10 +29,10 @@ import {
   CrownOutlined,
   LoadingOutlined,
 } from "@ant-design/icons";
-import { useAuth } from "./contexts/AuthContext";
+import { useAuth } from "../contexts/AuthContext";
 import { useParams, useNavigate } from "react-router-dom";
-import { formatLocalDate, formatLocalDateTime } from "./utils/timeUtils";
-import { calculateWorkflowProgress } from "./utils/progressUtils";
+import { formatLocalDate, formatLocalDateTime } from "../utils/timeUtils";
+import { calculateWorkflowProgress } from "../utils/progressUtils";
 
 const { Title, Text, Paragraph } = Typography;
 const { Step } = Steps;
@@ -378,7 +378,7 @@ function ApprovalWorkflowScreen() {
                 value={getProgressPercent()}
                 suffix="%"
                 valueStyle={{
-                  color: getProgressPercent() === 100 ? "#3f8600" : "#1890ff",
+                  color: getProgressPercent() === 100 ? "#2E7D32" : "#1B5E20",
                 }}
               />
               <Divider />
@@ -394,7 +394,11 @@ function ApprovalWorkflowScreen() {
                       : "blue"
                   }
                 >
-                  {contract.status?.toUpperCase()}
+                  {contract.status === "approved" 
+                    ? "APPROVED" 
+                    : contract.status === "rejected" 
+                    ? "REJECTED" 
+                    : workflow?.find(stage => stage.isActive)?.stageName?.toUpperCase() || contract.status?.toUpperCase()}
                 </Tag>
               </div>
             </Card>
