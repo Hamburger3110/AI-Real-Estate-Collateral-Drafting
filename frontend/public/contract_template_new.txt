@@ -1,0 +1,150 @@
+CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM
+Độc lập - Tự do - Hạnh phúc
+
+HỢP ĐỒNG TÍN DỤNG
+(Credit Agreement)
+
+Số hợp đồng: {doc_number}
+Ngày ký: {doc_signing_date}
+Nơi ký: {doc_signing_location_office}
+
+Căn cứ Luật các tổ chức tín dụng số 47/2010/QH12;
+Căn cứ Nghị định số 01/2021/NĐ-CP về hoạt động ngân hàng;
+Căn cứ nhu cầu và khả năng của các bên;
+
+Hôm nay, ngày {signing_day} tháng {signing_month} năm {signing_year}, tại {doc_signing_location_office}, chúng tôi gồm có:
+
+I. BÊN CHO VAY (BÊN A):
+Tên ngân hàng: {branch_name}
+Địa chỉ: {branch_address}
+Điện thoại: {branch_phone_number}
+Fax: {branch_fax}
+Mã số thuế: {branch_bizregcode}
+Đại diện: {branch_representative_name} - Chức vụ: {branch_representative_title}
+
+II. BÊN VAY (BÊN B):
+Họ và tên: {lender_name}
+Số CMND/CCCD: {lender_id_number}
+Ngày cấp: {lender_id_issue_date}
+Nơi cấp: {lender_id_issuer}
+Địa chỉ thường trú: {lender_address_original}
+Điện thoại: _______________
+
+III. BÊN BẢO ĐẢM (nếu có):
+Họ và tên: _______________
+Số CMND/CCCD: {spouse_id_number}
+Ngày cấp: {spouse_id_issue_date}
+Nơi cấp: {spouse_id_issuer}
+Địa chỉ: {spouse_address_original}
+
+IV. THÔNG TIN TÀI SẢN ĐẢM BẢO:
+
+1. Thông tin đất đai:
+   - Địa chỉ: {prop_address}
+   - Diện tích: {prop_area_formatted}
+   - Số giấy chứng nhận: {prop_certID}
+   - Ngày cấp GCN: {prop_cert_issue_date}
+   - Cơ quan cấp: {prop_cert_issuer}
+   - Chủ sở hữu theo GCN: {prop_cert_owner}
+   - Thửa đất số: {prop_detailed_id}
+   - Tờ bản đồ số: {prop_mapID}
+   - Mục đích sử dụng: {prop_purpose}
+   - Thời hạn sử dụng: {prop_period}
+   - Nguồn gốc sử dụng: {prop_origin}
+   - Hình thức sử dụng: {prop_usage_method}
+
+2. Thông tin tài sản trên đất (nếu có):
+   - Địa chỉ công trình: {aprop_address}
+   - Diện tích xây dựng: {aprop_construct_area} m²
+   - Diện tích sàn: {aprop_floor_area} m²
+   - Kết cấu: {aprop_construction_method}
+   - Cấp (hạng): {aprop_level}
+   - Tầng: {aprop_floor}
+   - Năm xây dựng: {aprop_yearbuilt}
+   - Ngày hoàn thành: {aprop_possessdue}
+
+3. Giá trị định giá:
+   - Giá trị tài sản: {prop_value_formatted}
+   - Bằng chữ: {prop_value_words}
+
+V. THÔNG TIN KHOẢN VAY:
+
+1. Số tiền vay: {loan_amount_formatted}
+   Bằng chữ: {loan_amount_words}
+
+2. Mục đích vay: _______________
+
+3. Thời hạn vay: _______________ tháng
+
+4. Lãi suất: _______________% /năm
+
+5. Phương thức trả nợ: _______________
+
+VI. QUYỀN VÀ NGHĨA VỤ CÁC BÊN:
+
+1. Quyền và nghĩa vụ của Bên A:
+   a) Quyền:
+   - Yêu cầu Bên B cung cấp đầy đủ, chính xác thông tin liên quan đến khoản vay
+   - Kiểm tra, giám sát việc sử dụng vốn vay
+   - Yêu cầu Bên B trả nợ đúng hạn
+   - Xử lý tài sản đảm bảo khi Bên B vi phạm hợp đồng
+
+   b) Nghĩa vụ:
+   - Giải ngân đúng thời hạn, đầy đủ số tiền theo hợp đồng
+   - Bảo mật thông tin của khách hàng
+   - Thông báo cho Bên B về các thay đổi lãi suất
+
+2. Quyền và nghĩa vụ của Bên B:
+   a) Quyền:
+   - Nhận đủ số tiền vay theo hợp đồng
+   - Được thông báo về các thay đổi lãi suất
+   - Được trả nợ trước hạn
+
+   b) Nghĩa vụ:
+   - Sử dụng vốn vay đúng mục đích
+   - Trả nợ gốc và lãi đầy đủ, đúng hạn
+   - Cung cấp thông tin chính xác, đầy đủ
+   - Thông báo kịp thời các thay đổi ảnh hưởng đến khả năng trả nợ
+
+VII. CAM KẾT CỦA CÁC BÊN:
+
+Bên A cam kết:
+- Giải ngân đúng hạn sau khi Bên B hoàn tất thủ tục
+- Áp dụng lãi suất theo quy định
+
+Bên B cam kết:
+- Sử dụng vốn vay đúng mục đích đã cam kết
+- Trả nợ đầy đủ, đúng hạn
+- Chấp hành các quy định của pháp luật
+
+VIII. ĐIỀU KHOẢN CHUNG:
+
+1. Hợp đồng này có hiệu lực từ ngày ký
+2. Các tranh chấp sẽ được giải quyết thông qua thương lượng, hòa giải hoặc khởi kiện ra Tòa án
+3. Hợp đồng được lập thành 03 bản, mỗi bên giữ 01 bản, 01 bản lưu hồ sơ
+
+Ngày {generation_day} tháng {generation_month} năm {generation_year}
+
+          BÊN A                                    BÊN B
+    (Ký, ghi rõ họ tên)                      (Ký, ghi rõ họ tên)
+
+
+    {branch_representative_name}                   {lender_name}
+
+---
+
+PHỤ LỤC: BIÊN BẢN BÀN GIAO TÀI SẢN ĐẢM BẢO
+
+Hôm nay, ngày ___/___/{generation_year}, tại {doc_signing_location_office}
+
+Bên A: {branch_name}
+Bên B: {lender_name}
+
+Tiến hành bàn giao tài sản đảm bảo với thông tin chi tiết như trên.
+
+Tài sản đảm bảo hiện trạng: Tốt, không có tranh chấp
+
+          BÊN A                                    BÊN B
+    (Ký, ghi rõ họ tên)                      (Ký, ghi rõ họ tên)
+
+Ghi chú: {aprop_note}

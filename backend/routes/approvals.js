@@ -36,9 +36,11 @@ router.get('/contract/:contractId', authenticateToken, async (req, res) => {
   const { contractId } = req.params;
   
   try {
-    // Get contract info
+    // Get contract info including contract URLs
     const contractResult = await pool.query(`
-      SELECT c.*, u.full_name as generated_by_name
+      SELECT c.*, u.full_name as generated_by_name,
+             c.generated_pot_uri as pdf_url,
+             COALESCE(c.generated_docx_uri, c.generated_pot_uri) as docx_url
       FROM contracts c
       LEFT JOIN users u ON c.generated_by = u.user_id
       WHERE c.contract_id = $1

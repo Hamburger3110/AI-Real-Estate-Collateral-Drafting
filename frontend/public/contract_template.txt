@@ -1,0 +1,28 @@
+HỢP ĐỒNG TÍN DỤNG
+
+Số hợp đồng: {{doc.number}}
+Ngày ký: {{doc.signing_date}}
+Nơi ký: {{doc.signing_location.office}}
+
+1. THÔNG TIN BÊN CHO VAY:
+Tên ngân hàng: {{branch.name}}
+Địa chỉ: {{branch.address}}
+
+2. THÔNG TIN BÊN VAY:
+Họ tên: {{lender.name}}
+Số CMND/CCCD: {{lender.id.number}}
+Nơi cấp: {{lender.id.issuer}}
+Ngày cấp: {{lender.id.issue_date}}
+Địa chỉ: {{lender.address.original}}
+
+3. THÔNG TIN TÀI SẢN ĐẢM BẢO:
+Địa chỉ tài sản: {{prop.address}}
+Diện tích: {{prop.area}}
+Giá trị: {{prop.value}}
+Số giấy chứng nhận: {{prop.certID}}
+
+4. THÔNG TIN KHOẢN VAY:
+Số tiền vay: {{loan.amount}}
+
+Ký tên:
+{{lender.name}}

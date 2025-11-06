@@ -29,6 +29,7 @@ app.use('/contracts', require('./routes/contracts'));
 app.use('/approvals', require('./routes/approvals'));
 app.use('/migrations', require('./routes/migrations'));
 app.use('/activity_logs', require('./routes/activityLogs'));
+app.use('/test', require('./routes/test-signed-urls'));
 app.use('/events', eventsRouter);
 app.use('/webhook', require('./routes/webhook'));
 app.use('/fptai', require('./routes/fptai'));

@@ -32,7 +32,7 @@ import {
 import { useAuth } from "./contexts/AuthContext";
 import { useParams, useNavigate } from "react-router-dom";
 import { formatLocalDate, formatLocalDateTime } from "./utils/timeUtils";
-import AppLayout from "./components/AppLayout";
+import { calculateWorkflowProgress } from "./utils/progressUtils";
 
 const { Title, Text, Paragraph } = Typography;
 const { Step } = Steps;
@@ -45,6 +45,8 @@ function ApprovalWorkflowScreen() {
   const [actionLoading, setActionLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [currentAction, setCurrentAction] = useState(null);
+  const [contractDocuments, setContractDocuments] = useState(null);
+  const [documentsLoading, setDocumentsLoading] = useState(false);
   const [form] = Form.useForm();
 
   const { token } = useAuth();
@@ -71,6 +73,7 @@ function ApprovalWorkflowScreen() {
       }
 
       const data = await response.json();
+      console.log('Workflow data received:', data);
       setWorkflow(data.workflow);
       setContract(data.contract);
     } catch (error) {
@@ -84,9 +87,34 @@ function ApprovalWorkflowScreen() {
     }
   }, [contractId, token]);
 
+  const loadContractDocuments = useCallback(async () => {
+    if (!contractId) return;
+    
+    setDocumentsLoading(true);
+    try {
+      const response = await fetch(`/contracts/${contractId}/documents`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const documents = await response.json();
+        setContractDocuments(documents);
+      } else {
+        console.error('Failed to load contract documents');
+      }
+    } catch (error) {
+      console.error('Error loading contract documents:', error);
+    } finally {
+      setDocumentsLoading(false);
+    }
+  }, [contractId, token]);
+
   useEffect(() => {
     fetchWorkflow();
-  }, [fetchWorkflow]);
+    loadContractDocuments();
+  }, [fetchWorkflow, loadContractDocuments]);
 
   const handleAction = async (action, stage) => {
     setCurrentAction({ action, stage });
@@ -147,11 +175,15 @@ function ApprovalWorkflowScreen() {
   };
 
   const getProgressPercent = () => {
-    if (!workflow) return 0;
-    const completedStages = workflow.filter(
-      (stage) => stage.status === "approved"
-    ).length;
-    return Math.round((completedStages / workflow.length) * 100);
+    const progress = calculateWorkflowProgress(workflow);
+    
+    console.log('Progress calculation:', {
+      totalStages: workflow?.length || 0,
+      progress,
+      workflow: workflow?.map(s => ({ stage: s.stage, status: s.status, approvedAt: s.approvedAt })) || []
+    });
+    
+    return progress;
   };
 
   if (loading) {
@@ -268,6 +300,78 @@ function ApprovalWorkflowScreen() {
               </Space>
             </Card>
 
+            {/* Contract Documents */}
+            {(contractDocuments || (contract.pdf_url || contract.docx_url)) && (
+              <Card title="Generated Contract" style={{ marginBottom: "24px" }} loading={documentsLoading}>
+                <Space direction="vertical" style={{ width: "100%" }}>
+                  {contractDocuments ? (
+                    <>
+                      {contractDocuments.pdf_url && (
+                        <div>
+                          <Text strong>PDF Contract:</Text>
+                          <br />
+                          <Button
+                            type="primary"
+                            icon={<FileTextOutlined />}
+                            onClick={() => window.open(contractDocuments.pdf_url, '_blank')}
+                            style={{ marginTop: "8px" }}
+                          >
+                            View PDF Contract
+                          </Button>
+                        </div>
+                      )}
+                      {contractDocuments.docx_url && (
+                        <div>
+                          <Text strong>Word Document:</Text>
+                          <br />
+                          <Button
+                            icon={<FileTextOutlined />}
+                            onClick={() => window.open(contractDocuments.docx_url, '_blank')}
+                            style={{ marginTop: "8px" }}
+                          >
+                            Download DOCX
+                          </Button>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {contract.pdf_url && (
+                        <div>
+                          <Text strong>PDF Contract:</Text>
+                          <br />
+                          <Button
+                            type="primary"
+                            icon={<FileTextOutlined />}
+                            onClick={() => window.open(contract.pdf_url, '_blank')}
+                            style={{ marginTop: "8px" }}
+                          >
+                            View PDF Contract
+                          </Button>
+                        </div>
+                      )}
+                      {contract.docx_url && (
+                        <div>
+                          <Text strong>Word Document:</Text>
+                          <br />
+                          <Button
+                            icon={<FileTextOutlined />}
+                            onClick={() => window.open(contract.docx_url, '_blank')}
+                            style={{ marginTop: "8px" }}
+                          >
+                            Download DOCX
+                          </Button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                  <Text type="secondary" style={{ fontSize: "12px" }}>
+                    Generated on {formatLocalDate(contract.generated_at)}
+                  </Text>
+                </Space>
+              </Card>
+            )}
+
             <Card title="Progress Overview">
               <Statistic
                 title="Overall Progress"
@@ -298,6 +402,78 @@ function ApprovalWorkflowScreen() {
 
           {/* Workflow Steps */}
           <Col xs={24} lg={16}>
+            {/* Contract Preview Section */}
+            {(contractDocuments || (contract.pdf_url || contract.docx_url)) && (
+              <Card title="Contract Review" style={{ marginBottom: "24px" }} loading={documentsLoading}>
+                <Row gutter={16}>
+                  {contractDocuments ? (
+                    <>
+                      {contractDocuments.pdf_url && (
+                        <Col xs={24} sm={12}>
+                          <Button
+                            type="primary"
+                            size="large"
+                            icon={<FileTextOutlined />}
+                            block
+                            onClick={() => window.open(contractDocuments.pdf_url, '_blank')}
+                          >
+                            📄 Review PDF Contract
+                          </Button>
+                        </Col>
+                      )}
+                      {contractDocuments.docx_url && (
+                        <Col xs={24} sm={12}>
+                          <Button
+                            size="large"
+                            icon={<FileTextOutlined />}
+                            block
+                            onClick={() => window.open(contractDocuments.docx_url, '_blank')}
+                          >
+                            📝 Download Word Document
+                          </Button>
+                        </Col>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {contract.pdf_url && (
+                        <Col xs={24} sm={12}>
+                          <Button
+                            type="primary"
+                            size="large"
+                            icon={<FileTextOutlined />}
+                            block
+                            onClick={() => window.open(contract.pdf_url, '_blank')}
+                          >
+                            📄 Review PDF Contract
+                          </Button>
+                        </Col>
+                      )}
+                      {contract.docx_url && (
+                        <Col xs={24} sm={12}>
+                          <Button
+                            size="large"
+                            icon={<FileTextOutlined />}
+                            block
+                            onClick={() => window.open(contract.docx_url, '_blank')}
+                          >
+                            📝 Download Word Document
+                          </Button>
+                        </Col>
+                      )}
+                    </>
+                  )}
+                </Row>
+                <Alert
+                  message="Review Required"
+                  description="Please review the generated contract documents before proceeding with the approval workflow."
+                  type="info"
+                  showIcon
+                  style={{ marginTop: "16px" }}
+                />
+              </Card>
+            )}
+
             <Card title="Approval Workflow">
               <Steps
                 direction="vertical"
@@ -310,9 +486,11 @@ function ApprovalWorkflowScreen() {
                     title={stage.stageName}
                     icon={getStageIcon(stage.stage)}
                     status={
-                      stage.status === "approved"
+                      stage.status?.toLowerCase() === "approved" || 
+                      stage.status?.toLowerCase() === "completed" ||
+                      stage.approvedAt
                         ? "finish"
-                        : stage.status === "rejected"
+                        : stage.status?.toLowerCase() === "rejected"
                         ? "error"
                         : stage.isActive
                         ? "process"
