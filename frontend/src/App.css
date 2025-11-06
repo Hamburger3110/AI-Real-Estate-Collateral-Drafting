@@ -36,3 +36,26 @@
     transform: rotate(360deg);
   }
 }
+
+/* Notification dropdown z-index fix */
+.ant-dropdown {
+  z-index: 1050 !important;
+}
+
+/* Modal z-index fix for notification details */
+.ant-modal-root {
+  z-index: 1100 !important;
+}
+
+.ant-modal-mask {
+  z-index: 1100 !important;
+}
+
+.ant-modal-wrap {
+  z-index: 1100 !important;
+}
+
+/* Ensure notification dropdown appears above other content */
+.notification-dropdown-overlay {
+  z-index: 1050 !important;
+}

@@ -32,6 +32,7 @@ app.use('/activity_logs', require('./routes/activityLogs'));
 app.use('/events', eventsRouter);
 app.use('/webhook', require('./routes/webhook'));
 app.use('/fptai', require('./routes/fptai'));
+app.use('/notifications', require('./routes/notifications'));
 
 // Health check endpoint
 app.get('/health', async (req, res) => {

@@ -15,6 +15,7 @@ import {
   message 
 } from 'antd';
 import { CheckCircleOutlined, WarningOutlined, EditOutlined, SaveOutlined, CloseOutlined } from '@ant-design/icons';
+import { formatLocalDate } from '../utils/timeUtils';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -198,7 +199,7 @@ const DocumentFieldReviewModal = ({
           </Row>
           <Row gutter={16} style={{ marginTop: 8 }}>
             <Col span={12}>
-              <Text strong>Upload Date:</Text> {new Date(document.upload_date).toLocaleDateString()}
+              <Text strong>Upload Date:</Text> {formatLocalDate(document.upload_date)}
             </Col>
             <Col span={12}>
               <Text strong>Status:</Text> 
