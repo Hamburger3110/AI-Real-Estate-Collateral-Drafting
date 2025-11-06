@@ -7,14 +7,15 @@ import 'antd/dist/reset.css';
 import { AuthProvider } from './contexts/AuthContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import ProtectedRoute from './components/ProtectedRoute';
-import LoginScreen from './LoginScreen';
-import DocumentUploadScreen from './DocumentUploadScreen';
-import ContractListScreen from './ContractListScreen';
-import MultiStepApprovalScreen from './MultiStepApprovalScreen';
-import ContractReviewScreen from './ContractReviewScreen';
-import ContractGenerationScreen from './ContractGenerationScreen';
-import ApprovalDashboard from './ApprovalDashboard';
-import ApprovalWorkflowScreen from './ApprovalWorkflowScreen';
+import LoginScreen from './components/LoginScreen';
+import DocumentUploadScreen from './components/DocumentUploadScreen';
+import ContractListScreen from './components/ContractListScreen';
+import MultiStepApprovalScreen from './components/MultiStepApprovalScreen';
+import ContractReviewScreen from './components/ContractReviewScreen';
+import ContractGenerationScreen from './components/ContractGenerationScreen';
+import ApprovalDashboard from './components/ApprovalDashboard';
+import ApprovalWorkflowScreen from './components/ApprovalWorkflowScreen';
+import ActivityLogsScreen from './components/ActivityLogsScreen';
 
 function App() {
   return (
@@ -81,6 +82,14 @@ function App() {
               element={
                 <ProtectedRoute requiredPermissions={['VIEW_CONTRACTS']}>
                   <ContractReviewScreen />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/activity-logs" 
+              element={
+                <ProtectedRoute requiredPermissions={['VIEW_ACTIVITY_LOGS']}>
+                  <ActivityLogsScreen />
                 </ProtectedRoute>
               } 
             />

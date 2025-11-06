@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
 const { pool } = require('../db');
+const { quickLog } = require('../middleware/activityLogger');
 
 // Approval workflow stages and their order
 const APPROVAL_STAGES = {
@@ -141,6 +142,8 @@ router.post('/contract/:contractId/stage/:stage', authenticateToken, async (req,
         const currentIndex = STAGE_ORDER.indexOf(stage);
         if (currentIndex < STAGE_ORDER.length - 1) {
           newStage = STAGE_ORDER[currentIndex + 1];
+          // Update status to reflect current workflow stage
+          newStatus = 'processing';
         } else {
           newStage = APPROVAL_STAGES.COMPLETED;
           newStatus = 'approved';
@@ -159,20 +162,24 @@ router.post('/contract/:contractId/stage/:stage', authenticateToken, async (req,
 
       await client.query('COMMIT');
 
-      // Log activity - get first document associated with this contract for logging
-      const firstDocResult = await pool.query('SELECT document_id FROM documents WHERE contract_id = $1 LIMIT 1', [contractId]);
-      const documentId = firstDocResult.rows.length > 0 ? firstDocResult.rows[0].document_id : null;
+      // Log the specific approval action
+      await quickLog.approvalAction(req, contractId, contract.contract_number, action, stage, comments);
       
-      if (documentId) {
-        await pool.query(`
-          INSERT INTO activity_logs (user_id, document_id, action, action_detail)
-          VALUES ($1, $2, $3, $4)
-        `, [
-          userId,
-          documentId,
-          `contract_${action}`,
-          `${action === 'approve' ? 'Approved' : 'Rejected'} contract ${contract.contract_number} at stage ${formatStageName(stage)}. Comments: ${comments || 'None'}`
-        ]);
+      // Log workflow stage transitions
+      if (action === 'approve') {
+        // Log stage completion
+        await quickLog.workflowStageComplete(req, contractId, contract.contract_number, formatStageName(stage), req.user.full_name);
+        
+        // If moving to next stage, log stage start
+        if (newStage !== APPROVAL_STAGES.COMPLETED) {
+          await quickLog.workflowStageStart(req, contractId, contract.contract_number, formatStageName(newStage), 'System');
+        } else {
+          // Log workflow completion
+          await quickLog.workflowComplete(req, contractId, contract.contract_number, 'approved');
+        }
+      } else if (action === 'reject') {
+        // Log workflow completion with rejection
+        await quickLog.workflowComplete(req, contractId, contract.contract_number, 'rejected');
       }
 
       res.json({

@@ -20,8 +20,8 @@ import {
   ExclamationCircleOutlined,
   FileTextOutlined,
 } from "@ant-design/icons";
-import { useAuth } from "./contexts/AuthContext";
-import { formatLocalDate } from "./utils/timeUtils";
+import { useAuth } from "../contexts/AuthContext";
+import { formatLocalDate } from "../utils/timeUtils";
 import { useNavigate } from "react-router-dom";
 
 const { Title, Text } = Typography;
@@ -228,7 +228,7 @@ function ApprovalDashboard() {
               <Statistic
                 title="Pending"
                 value={stats.overview.pending}
-                valueStyle={{ color: "#1890ff" }}
+                valueStyle={{ color: "#1B5E20" }}
                 prefix={<ClockCircleOutlined />}
               />
             </Card>

@@ -29,8 +29,7 @@ import {
   EyeOutlined,
 } from "@ant-design/icons";
 import { useParams, useNavigate } from "react-router-dom";
-import { useAuth } from "./contexts/AuthContext";
-import AppLayout from "./components/AppLayout";
+import { useAuth } from "../contexts/AuthContext";
 
 const { Title, Text } = Typography;
 const { confirm } = Modal;
@@ -139,7 +138,9 @@ function ContractGenerationScreen() {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
 
-      message.success("Contract generated, downloaded, and uploaded to S3 successfully!");
+      message.success(
+        "Contract generated, downloaded, and uploaded to S3 successfully!"
+      );
 
       // Refresh preview after generation
       await loadGenerationPreview();
@@ -234,23 +235,22 @@ function ContractGenerationScreen() {
   }
 
   return (
-    <AppLayout>
-      <div style={{ padding: "24px" }}>
-        <div style={{ marginBottom: "24px" }}>
-          <Button
-            onClick={() => navigate("/contracts")}
-            style={{ marginBottom: "16px" }}
-          >
-            ← Back to Contracts
-          </Button>
+    <div style={{ padding: "24px" }}>
+      <div style={{ marginBottom: "24px" }}>
+        <Button
+          onClick={() => navigate("/contracts")}
+          style={{ marginBottom: "16px" }}
+        >
+          ← Back to Contracts
+        </Button>
 
-          <Title level={2}>
-            <FileTextOutlined /> Contract Generation
-          </Title>
-          <Text type="secondary">
-            Generate contract document from extracted field data
-          </Text>
-        </div>
+        <Title level={2}>
+          <FileTextOutlined /> Contract Generation
+        </Title>
+        <Text type="secondary">
+          Generate contract document from extracted field data
+        </Text>
+      </div>
 
       <Row gutter={24}>
         {/* Contract Information */}
@@ -409,8 +409,7 @@ function ContractGenerationScreen() {
             ))}
         </Form>
       </Modal>
-      </div>
-    </AppLayout>
+    </div>
   );
 }
 

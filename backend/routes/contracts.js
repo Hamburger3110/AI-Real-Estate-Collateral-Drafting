@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
 const { createContract, pool } = require('../db');
+const { quickLog } = require('../middleware/activityLogger');
 
 // Create sample contracts (development only)
 router.post('/seed', authenticateToken, async (req, res) => {
@@ -120,6 +121,12 @@ router.post('/', authenticateToken, async (req, res) => {
       }
     }
 
+    // Log activity
+    await quickLog.contractCreate(req, contract.contract_id, contract.contract_number);
+    
+    // Log workflow start - contracts typically start at document_review stage
+    await quickLog.workflowStageStart(req, contract.contract_id, contract.contract_number, 'Document Review', 'System');
+
     res.json(contract);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -182,6 +189,7 @@ router.get('/', authenticateToken, async (req, res) => {
       GROUP BY c.contract_id, u_gen.full_name, u_app.full_name
       ORDER BY c.generated_at DESC
     `);
+    
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -217,6 +225,10 @@ router.get('/:id', authenticateToken, async (req, res) => {
 
     const contract = result.rows[0];
     contract.documents = documentsResult.rows;
+
+    // Log contract view activity
+    await quickLog.contractView(req, contract.contract_id, contract.contract_number);
+
     res.json(contract);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -268,7 +280,12 @@ router.put('/:id', authenticateToken, async (req, res) => {
       ]
     );
     
-    res.json(result.rows[0]);
+    // Log contract update activity
+    const updatedContract = result.rows[0];
+    const changedFields = Object.keys(req.body).join(', ');
+    await quickLog.contractUpdate(req, updatedContract.contract_id, updatedContract.contract_number, changedFields);
+
+    res.json(updatedContract);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -342,6 +359,9 @@ router.post('/:id/generate', authenticateToken, async (req, res) => {
         contractId: id 
       });
     }
+    
+    // Log contract generation activity
+    await quickLog.contractGenerate(req, result.contractId, result.contractNumber || `Contract-${id}`);
     
     // Set headers for file download
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');

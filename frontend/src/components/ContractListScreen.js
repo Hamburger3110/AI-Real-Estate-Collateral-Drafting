@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
-  Layout,
   Table,
   Button,
   Space,
@@ -8,8 +7,6 @@ import {
   Input,
   Select,
   Card,
-  Avatar,
-  Badge,
   Dropdown,
   Menu,
   Progress,
@@ -35,7 +32,6 @@ import {
   CloseOutlined,
   MoreOutlined,
   UserOutlined,
-  BellOutlined,
   DownloadOutlined,
   ReloadOutlined,
   FileTextOutlined,
@@ -47,14 +43,14 @@ import {
   DeleteOutlined,
   SyncOutlined,
 } from "@ant-design/icons";
-import { useAuth } from "./contexts/AuthContext";
+import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import NewContractModal from "./NewContractModal";
-import useDocumentPolling from "./hooks/useDocumentPolling";
-import DocumentReviewPanel from "./components/DocumentReviewPanel";
-import DocumentFieldReviewModal from "./components/DocumentFieldReviewModal";
-import { formatLocalDate } from "./utils/timeUtils";
-import { getContractProgress } from "./utils/progressUtils";
+import useDocumentPolling from "../hooks/useDocumentPolling";
+import DocumentReviewPanel from "./DocumentReviewPanel";
+import DocumentFieldReviewModal from "./DocumentFieldReviewModal";
+import { formatLocalDate } from "../utils/timeUtils";
+import { getContractProgress } from "../utils/progressUtils";
 
 const { Option } = Select;
 const { Text } = Typography;
@@ -89,6 +85,113 @@ function ContractListScreen() {
   // Refs to avoid circular dependencies in useCallback
   const fetchContractsRef = useRef(null);
   const fetchContractDetailsRef = useRef(null);
+
+  // Helper functions to transform database values
+  const formatStatus = useCallback((dbStatus, currentApprovalStage) => {
+    // If we have a current approval stage, show that instead of generic status
+    if (currentApprovalStage && dbStatus === 'processing') {
+      const stageStatusMap = {
+        'document_review': 'Document Review',
+        'credit_analysis': 'Credit Analysis',
+        'legal_review': 'Legal Review',
+        'risk_assessment': 'Risk Assessment',
+        'final_approval': 'Final Approval',
+        'completed': 'Completed'
+      };
+      return stageStatusMap[currentApprovalStage] || 'Under Review';
+    }
+    
+    const statusMap = {
+      started: "Draft",
+      processing: "Under Review",
+      approved: "Approved",
+      rejected: "Rejected",
+      pending_documents: "Pending Documents",
+    };
+    return statusMap[dbStatus] || dbStatus;
+  }, []);
+
+  const calculateProgress = useCallback((status, approvedAt, workflow = null) => {
+    // Use workflow-based calculation if available, otherwise fall back to status-based
+    return getContractProgress(workflow, status, approvedAt);
+  }, []);
+
+  // Cache to avoid refetching the same contract workflow data multiple times
+  const workflowCache = useRef(new Map());
+
+  // Fetch workflow data for a specific contract to ensure accurate progress
+  const refreshContractWorkflow = useCallback(
+    async (contractId) => {
+      const cacheKey = `${contractId}`;
+      const cached = workflowCache.current.get(cacheKey);
+      
+      // If we have recent cached data (less than 30 seconds old), use it
+      if (cached && Date.now() - cached.timestamp < 30000) {
+        return cached.data;
+      }
+
+      try {
+        const workflowResponse = await fetch(
+          `http://localhost:3001/approvals/contract/${contractId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+        
+        if (workflowResponse.ok) {
+          const workflowData = await workflowResponse.json();
+          const accurateProgress = calculateProgress(
+            workflowData.contract.status, 
+            workflowData.contract.approved_at, 
+            workflowData.workflow
+          );
+          
+          const result = { workflow: workflowData.workflow, progress: accurateProgress };
+          
+          // Cache the result
+          workflowCache.current.set(cacheKey, {
+            data: result,
+            timestamp: Date.now()
+          });
+          
+          // Update the contract in the main contracts array with accurate progress
+          setContracts(prevContracts => 
+            prevContracts.map(contract => 
+              contract.id === parseInt(contractId)
+                ? { 
+                    ...contract, 
+                    progress: accurateProgress, 
+                    workflow: workflowData.workflow,
+                    status: formatStatus(workflowData.contract.status, workflowData.contract.current_approval_stage),
+                    currentApprovalStage: workflowData.contract.current_approval_stage
+                  }
+                : contract
+            )
+          );
+          
+          // If this contract is currently selected, update it too
+          if (selectedContract && selectedContract.id === parseInt(contractId)) {
+            setSelectedContract(prev => ({
+              ...prev,
+              progress: accurateProgress,
+              workflow: workflowData.workflow,
+              status: formatStatus(workflowData.contract.status, workflowData.contract.current_approval_stage),
+              currentApprovalStage: workflowData.contract.current_approval_stage
+            }));
+          }
+          
+          return result;
+        }
+      } catch (error) {
+        console.log("Could not fetch workflow data for contract:", contractId, error);
+        return null;
+      }
+    },
+    [token, selectedContract, calculateProgress, formatStatus]
+  );
 
   // Callback when document status changes (from polling)
   const handleDocumentStatusChange = useCallback(
@@ -181,7 +284,8 @@ function ContractListScreen() {
         customerName: contract.customer_name,
         propertyAddress: contract.property_address,
         loanAmount: parseFloat(contract.loan_amount),
-        status: formatStatus(contract.status),
+        status: formatStatus(contract.status, contract.current_approval_stage),
+        // Always use status-based calculation initially, workflow data will update it
         progress: calculateProgress(contract.status, contract.approved_at),
         assignedTo: contract.generated_by_name || "Unassigned",
         approvedBy: contract.approved_by_name,
@@ -191,6 +295,8 @@ function ContractListScreen() {
         documentFileNames: contract.document_file_names || [],
         documentCount: parseInt(contract.document_count) || 0,
         rawStatus: contract.status,
+        currentApprovalStage: contract.current_approval_stage,
+        hasWorkflowData: contract.total_workflow_stages > 0, // Track if contract has workflow data
       }));
 
       console.log("📊 Transformed contracts:", transformedContracts);
@@ -204,7 +310,9 @@ function ContractListScreen() {
     } finally {
       setLoading(false);
     }
-  }, [token, user]);
+  }, [token, user, calculateProgress, formatStatus]);
+
+
 
   // Fetch detailed contract information including documents
   const fetchContractDetails = useCallback(
@@ -234,7 +342,7 @@ function ContractListScreen() {
         // Fetch workflow data for accurate progress calculation
         try {
           const workflowResponse = await fetch(
-            `http://localhost:3001/approvals/${contractId}`,
+            `http://localhost:3001/approvals/contract/${contractId}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -246,7 +354,7 @@ function ContractListScreen() {
           if (workflowResponse.ok) {
             const workflowData = await workflowResponse.json();
             // Update the selected contract with accurate progress based on workflow
-            if (selectedContract && selectedContract.id == contractId) {
+            if (selectedContract && selectedContract.id === parseInt(contractId)) {
               const accurateProgress = calculateProgress(
                 selectedContract.rawStatus, 
                 selectedContract.approvedAt, 
@@ -257,6 +365,15 @@ function ContractListScreen() {
                 progress: accurateProgress,
                 workflow: workflowData.workflow
               }));
+              
+              // Also update the contract in the main contracts array to maintain consistency
+              setContracts(prevContracts => 
+                prevContracts.map(contract => 
+                  contract.id === parseInt(contractId) 
+                    ? { ...contract, progress: accurateProgress, workflow: workflowData.workflow }
+                    : contract
+                )
+              );
             }
           }
         } catch (workflowError) {
@@ -301,7 +418,7 @@ function ContractListScreen() {
         setDocumentsLoading(false);
       }
     },
-    [token]
+    [token, selectedContract, calculateProgress]
   );
 
   // Handle field review for documents with low confidence
@@ -481,22 +598,51 @@ function ContractListScreen() {
     fetchContracts();
   }, [fetchContracts]);
 
-  // Helper functions to transform database values
-  const formatStatus = (dbStatus) => {
-    const statusMap = {
-      started: "Draft",
-      processing: "Under Review",
-      approved: "Approved",
-      rejected: "Rejected",
-      pending_documents: "Pending Documents",
+  // Auto-refresh workflow data for contracts that are in processing states
+  useEffect(() => {
+    const refreshWorkflowsForProcessingContracts = async () => {
+      if (contracts.length === 0) return;
+      
+      // Refresh workflow data for contracts that are in processing states to get accurate progress
+      const contractsNeedingWorkflowRefresh = contracts.filter(contract => 
+        contract.rawStatus === 'processing' || 
+        contract.rawStatus === 'started' ||
+        contract.status.includes('Review') ||
+        contract.status.includes('Analysis') ||
+        contract.status === 'Draft' ||
+        contract.status === 'Under Review'
+      );
+      
+      // If no contracts need refresh, return
+      if (contractsNeedingWorkflowRefresh.length === 0) {
+        return;
+      }
+      
+      console.log(`Refreshing workflow data for ${contractsNeedingWorkflowRefresh.length} contracts`);
+      
+      // Refresh workflow data for these contracts concurrently (limit to avoid overload)
+      const contractsToRefresh = contractsNeedingWorkflowRefresh.slice(0, 5);
+      
+      // Use Promise.all to fetch all workflow data concurrently for faster updates
+      const refreshPromises = contractsToRefresh.map((contract, index) => 
+        // Small staggered delay to avoid overwhelming the server
+        new Promise(resolve => {
+          setTimeout(() => {
+            refreshContractWorkflow(contract.id).then(resolve);
+          }, index * 50); // Very small delay - 50ms between each request
+        })
+      );
+      
+      await Promise.all(refreshPromises);
     };
-    return statusMap[dbStatus] || dbStatus;
-  };
 
-  const calculateProgress = (status, approvedAt, workflow = null) => {
-    // Use workflow-based calculation if available, otherwise fall back to status-based
-    return getContractProgress(workflow, status, approvedAt);
-  };
+    // Run this effect immediately when contracts are loaded
+    if (contracts.length > 0) {
+      refreshWorkflowsForProcessingContracts();
+    }
+  }, [contracts, refreshContractWorkflow]);
+
+
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -572,6 +718,10 @@ function ContractListScreen() {
       message.success("Contract updated successfully");
       setEditModalVisible(false);
       editForm.resetFields();
+      
+      // Refresh workflow data for accurate progress
+      await refreshContractWorkflow(selectedContract.id);
+      
       fetchContracts(); // Refresh the list
     } catch (error) {
       console.error("Error updating contract:", error);
@@ -644,6 +794,10 @@ function ContractListScreen() {
       }
 
       message.success(`Contract ${newStatus} successfully`);
+      
+      // Refresh workflow data for accurate progress
+      await refreshContractWorkflow(contractId);
+      
       fetchContracts(); // Refresh the list
     } catch (error) {
       console.error("Error updating contract:", error);
@@ -790,7 +944,7 @@ function ContractListScreen() {
       dataIndex: "progress",
       key: "progress",
       width: 120,
-      render: (progress) => (
+      render: (progress, record) => (
         <Progress
           percent={progress}
           size="small"
@@ -801,6 +955,7 @@ function ContractListScreen() {
               ? "exception"
               : "active"
           }
+          title={record.hasWorkflowData ? "Workflow-based progress" : "Status-based progress (may update)"}
         />
       ),
     },
@@ -1099,7 +1254,7 @@ function ContractListScreen() {
                               <List.Item.Meta
                                 avatar={
                                   <FileTextOutlined
-                                    style={{ color: "#1890ff" }}
+                                    style={{ color: "#1B5E20" }}
                                   />
                                 }
                                 title={

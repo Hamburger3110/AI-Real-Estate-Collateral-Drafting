@@ -16,6 +16,7 @@ import {
   CheckCircleOutlined,
   EyeOutlined,
   DownOutlined,
+  ClockCircleOutlined,
 } from "@ant-design/icons";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -72,6 +73,14 @@ function NavigationHeader() {
     });
   }
 
+  if (hasPermission("VIEW_ACTIVITY_LOGS")) {
+    menuItems.push({
+      key: "/activity-logs",
+      icon: <ClockCircleOutlined />,
+      label: "Activity Logs",
+    });
+  }
+
   // if (hasPermission('VIEW_CONTRACTS')) {
   //   menuItems.push({
   //     key: '/review',
@@ -100,21 +109,21 @@ function NavigationHeader() {
 
   const getRoleBadgeColor = (role) => {
     const colors = {
-      ADMIN: "#f50",
-      CREDIT_OFFICER: "#2db7f5",
-      LEGAL_OFFICER: "#87d068",
-      MANAGER: "#108ee9",
-      VIEWER: "#999",
+      ADMIN: "#D32F2F",
+      CREDIT_OFFICER: "#1B5E20",
+      LEGAL_OFFICER: "#2E7D32",
+      MANAGER: "#388E3C",
+      VIEWER: "#757575",
     };
-    return colors[role] || "#999";
+    return colors[role] || "#757575";
   };
 
   return (
     <Header
       style={{
-        background: "#fff",
+        background: "linear-gradient(135deg, #1B5E20 0%, #2E7D32 100%)",
         padding: "0 24px",
-        boxShadow: "0 2px 8px #f0f1f2",
+        boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
@@ -127,7 +136,7 @@ function NavigationHeader() {
           style={{
             fontWeight: "bold",
             fontSize: "18px",
-            color: "#1890ff",
+            color: "#FFFFFF",
             marginRight: "32px",
           }}
         >
@@ -144,6 +153,7 @@ function NavigationHeader() {
             backgroundColor: "transparent",
             minWidth: "400px",
           }}
+          theme="dark"
         />
       </div>
 
@@ -151,13 +161,13 @@ function NavigationHeader() {
         <NotificationDropdown />
 
         <div style={{ textAlign: "right", minWidth: "120px", display:'flex', flexDirection:'column', alignItems:'flex-end' }}>
-          <Text strong style={{ whiteSpace: "nowrap" }}>
+          <Text strong style={{ whiteSpace: "nowrap", color: "#FFFFFF" }}>
             {user?.full_name || user?.email || "User"}
           </Text>
           <Text
             style={{
               fontSize: "12px",
-              color: getRoleBadgeColor(user?.role),
+              color: "#FFB300",
               fontWeight: 500,
               whiteSpace: "nowrap",
             }}
