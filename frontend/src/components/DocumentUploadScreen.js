@@ -412,9 +412,10 @@ function DocumentUploadScreen() {
                     onClick={handleSubmit}
                     disabled={fileList.length === 0}
                     icon={<CloudUploadOutlined />}
+                    className="vp-upload-submit"
                     style={{
-                      background: '#52c41a',
-                      borderColor: '#52c41a'
+                      background: 'linear-gradient(135deg, #23B44F 0%, #0D185B 100%)',
+                      border: 'none'
                     }}
                   >
                     {loading ? 'Uploading to AWS S3...' : `Upload ${fileList.length} Document(s)`}

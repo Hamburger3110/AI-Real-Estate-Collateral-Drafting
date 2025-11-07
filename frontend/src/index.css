@@ -1,7 +1,7 @@
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+  font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto',
+    'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -43,4 +43,92 @@ code {
 /* Fix tooltip z-index */
 .ant-tooltip {
   z-index: 1015 !important;
+}
+
+/* Header menu selected state: use semi-transparent black instead of blue */
+.ant-menu-dark.ant-menu-horizontal > .ant-menu-item-selected,
+.ant-menu-dark.ant-menu-horizontal > .ant-menu-submenu-selected {
+  background: rgba(0, 0, 0, 0.2) !important;
+}
+
+.ant-menu-dark.ant-menu-horizontal > .ant-menu-item-selected a,
+.ant-menu-dark.ant-menu-horizontal > .ant-menu-submenu-selected a {
+  color: #ffffff !important;
+}
+
+/* Override hover/focus border color to VPBank green */
+.ant-input:hover,
+.ant-input:focus,
+.ant-input-affix-wrapper:hover,
+.ant-input-affix-wrapper-focused {
+  border-color: #23B44F !important;
+  box-shadow: 0 0 0 2px rgba(35, 180, 79, 0.2) !important;
+}
+
+.ant-select:not(.ant-select-disabled):hover .ant-select-selector,
+.ant-select-focused .ant-select-selector {
+  border-color: #23B44F !important;
+  box-shadow: 0 0 0 2px rgba(35, 180, 79, 0.2) !important;
+}
+
+.ant-btn-default:hover,
+.ant-btn-default:focus {
+  border-color: #23B44F !important;
+  color: #23B44F !important;
+}
+
+/* Keep primary button on hover consistent with custom gradient */
+.ant-btn-primary:hover,
+.ant-btn-primary:focus {
+  background: linear-gradient(135deg, #23B44F 0%, #0D185B 100%) !important;
+  border-color: transparent !important;
+}
+
+/* Upload page submit button hover shadow */
+.vp-upload-submit.ant-btn-primary:hover,
+.vp-upload-submit.ant-btn-primary:focus {
+  box-shadow: 0 4px 12px rgba(35, 180, 79, 0.3) !important;
+}
+
+/* Upload (Dragger) green theme overrides */
+.vp-upload-area.ant-upload.ant-upload-drag,
+.vp-upload-area.ant-upload-wrapper .ant-upload-drag {
+  border: 1px dashed #23B44F !important;
+}
+.vp-upload-area.ant-upload.ant-upload-drag:hover,
+.vp-upload-area.ant-upload-wrapper .ant-upload-drag:hover,
+.vp-upload-area.ant-upload.ant-upload-drag.ant-upload-drag-hover,
+.vp-upload-area.ant-upload-wrapper .ant-upload-drag.ant-upload-drag-hover,
+.vp-upload-area.ant-upload.ant-upload-drag:focus,
+.vp-upload-area.ant-upload-wrapper .ant-upload-drag:focus {
+  border-color: #23B44F !important;
+  box-shadow: 0 0 0 2px rgba(35, 180, 79, 0.08) !important;
+}
+.vp-upload-area .ant-upload-drag-icon .anticon {
+  color: #23B44F !important;
+}
+.vp-upload-area .ant-upload-text,
+.vp-upload-area .ant-upload-hint {
+  color: #1B883C !important;
+}
+
+/* Spinner (loading) color override */
+.ant-spin-dot-item {
+  background-color: #23B44F !important;
+}
+
+/* Steps component color theme (process/finish) */
+.ant-steps-item-process .ant-steps-icon,
+.ant-steps-item-process .ant-steps-item-icon .ant-steps-icon {
+  color: #23B44F !important;
+}
+.ant-steps-item-finish .ant-steps-item-icon {
+  border-color: #23B44F !important;
+}
+.ant-steps-item-finish .ant-steps-icon {
+  color: #23B44F !important;
+}
+.ant-steps-item-finish .ant-steps-item-title::after,
+.ant-steps-item-process .ant-steps-item-title::after {
+  background-color: #b7eb8f !important;
 }

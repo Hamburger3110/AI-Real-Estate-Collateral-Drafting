@@ -881,7 +881,7 @@ function ContractListScreen() {
         <Button
           type="link"
           onClick={() => handleContractAction("view", record)}
-          style={{ padding: 0, height: "auto", fontSize: "14px" }}
+          style={{ padding: 0, height: "auto", fontSize: "14px", color: "#1B883C" }}
         >
           {text || "N/A"}
         </Button>
@@ -948,6 +948,7 @@ function ContractListScreen() {
         <Progress
           percent={progress}
           size="small"
+          strokeColor="#23B44F"
           status={
             progress === 100
               ? "success"
@@ -1013,7 +1014,7 @@ function ContractListScreen() {
           }}
         >
           <div>
-            <h2>Contract List</h2>
+            <h2 style={{ textAlign: "left", fontWeight: 700 }}>Contract List</h2>
             <p style={{ color: "#666", margin: 0 }}>
               Total: {contracts.length} contracts | Filtered:{" "}
               {filteredContracts.length} contracts
@@ -1076,6 +1077,10 @@ function ContractListScreen() {
             <Button
               type="primary"
               onClick={() => setNewContractModalVisible(true)}
+              style={{
+                background: 'linear-gradient(135deg, #23B44F 0%, #0D185B 100%)',
+                border: 'none'
+              }}
             >
               New Contract
             </Button>
@@ -1206,6 +1211,7 @@ function ContractListScreen() {
                 <Progress
                   percent={selectedContract.progress}
                   size="small"
+                  strokeColor="#23B44F"
                   status={
                     selectedContract.progress === 100
                       ? "success"

@@ -24,7 +24,7 @@ function ContractsList() {
   if (error) return <div>Error: {error}</div>;
   return (
     <div>
-      <h2>Contracts</h2>
+      <h2 style={{ textAlign: 'left' }}>Contracts</h2>
       <ul>
         {contracts.map(contract => (
           <li key={contract.contract_id}>

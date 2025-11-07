@@ -121,7 +121,7 @@ function NavigationHeader() {
   return (
     <Header
       style={{
-        background: "linear-gradient(135deg, #1B5E20 0%, #2E7D32 100%)",
+        background: "linear-gradient(135deg, #23B44F 0%, #0D185B 100%)",
         padding: "0 24px",
         boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
         display: "flex",

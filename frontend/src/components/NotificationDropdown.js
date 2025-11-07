@@ -201,7 +201,7 @@ const NotificationDropdown = () => {
         <Badge count={unreadCount} size="small">
           <BellOutlined 
             style={{ 
-              color: '#1B5E20', 
+              color: '#FFFFFF', 
               fontSize: '18px',
               cursor: 'pointer'
             }} 

@@ -8,6 +8,10 @@
 
 const fptaiConfig = require('../config/fptai-config');
 const bedrockConfig = require('../config/bedrock-config');
+const { processLegalRegistration } = require('./legal-registration-processor');
+const { detect } = require('./qr-detector');
+const { extractTextWithVietOCR } = require('./viet-ocr');
+const { qaWithBedrockText } = require('./bedrock-qa');
 const { pool } = require('../db');
 
 // Document type to API routing configuration
@@ -64,23 +68,55 @@ async function processDocument(fileBuffer, fileName, documentType, documentId) {
       );
 
     } else if (apiType === 'BEDROCK') {
-      // Process with AWS Bedrock
-      extractionResult = await bedrockConfig.submitDocumentForOCR(
-        fileBuffer, 
-        fileName, 
-        documentType, 
-        documentId
-      );
+      if (documentType === 'Legal Registration') {
+        // Use local orchestration: QR -> (if URL/text) Bedrock QA OR VietOCR -> Bedrock QA
+        const orchestration = await processLegalRegistration(
+          fileBuffer,
+          fileName,
+          documentId,
+          {
+            detectQr: detect,
+            extractTextWithVietOCR,
+            qaWithBedrockText,
+            parseBedrockResult: bedrockConfig.parseExtractionResult
+          }
+        );
 
-      if (!extractionResult.success) {
-        throw new Error(`Bedrock extraction failed: ${extractionResult.error}`);
+        if (!orchestration || orchestration.success !== true) {
+          throw new Error(orchestration && orchestration.error ? orchestration.error : 'Legal registration processing failed');
+        }
+
+        // Map orchestration result to parsedResult shape expected by updater
+        parsedResult = {
+          success: true,
+          confidenceScore: orchestration.confidence_score || 0,
+          needsManualReview: !!orchestration.needs_manual_review,
+          extractedData: orchestration.extracted_json || {},
+          rawResponse: orchestration.raw || {}
+        };
+
+        // For audit
+        extractionResult = { success: true, data: orchestration };
+        apiType = 'LEGAL_PIPELINE';
+      } else {
+        // Process other types with AWS Bedrock image path
+        extractionResult = await bedrockConfig.submitDocumentForOCR(
+          fileBuffer, 
+          fileName, 
+          documentType, 
+          documentId
+        );
+
+        if (!extractionResult.success) {
+          throw new Error(`Bedrock extraction failed: ${extractionResult.error}`);
+        }
+
+        // Parse Bedrock result
+        parsedResult = bedrockConfig.parseExtractionResult(
+          extractionResult.data, 
+          documentType
+        );
       }
-
-      // Parse Bedrock result
-      parsedResult = bedrockConfig.parseExtractionResult(
-        extractionResult.data, 
-        documentType
-      );
     }
 
     if (!parsedResult.success) {
