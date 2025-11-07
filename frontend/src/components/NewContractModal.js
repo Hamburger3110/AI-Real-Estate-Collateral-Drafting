@@ -607,7 +607,7 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
   const renderDocumentUpload = () => (
     <div>
       <Card title="Upload Supporting Documents" style={{ marginBottom: 16 }}>
-        <Dragger {...uploadProps}>
+        <Dragger {...uploadProps} className="vp-upload-area">
           <p className="ant-upload-drag-icon">
             <InboxOutlined />
           </p>
@@ -657,6 +657,7 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
                           percent={uploadProgress[item.uid]} 
                           status={item.status === 'error' ? 'exception' : 'active'}
                           size="small"
+                          strokeColor="#23B44F"
                         />
                       )}
                       {item.status === 'done' && (
@@ -713,7 +714,7 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
             <Text strong>Customer:</Text> {contractData.customer_name}<br />
             <Text strong>Property:</Text> {contractData.property_address}<br />
             <Text strong>Loan Amount:</Text> ${contractData.loan_amount?.toLocaleString()}<br />
-            <Text strong>Status:</Text> <Tag color="blue">{contractData.status}</Tag><br />
+            <Text strong>Status:</Text> <Tag color="#23B44F">{contractData.status}</Tag><br />
             <Text strong>Approval Stage:</Text> <Tag color="orange">{contractData.current_approval_stage}</Tag>
           </div>
         )}
@@ -748,7 +749,7 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
                   <Space>
                     <FileTextOutlined style={{ color: '#1B5E20' }} />
                     <Text strong>{item.name}</Text>
-                    <Tag color="blue">{item.type}</Tag>
+                    <Tag color="#23B44F">{item.type}</Tag>
                     {(() => {
                       const confidenceScore = getConfidenceScore(item);
                       return item.status === 'Extracted' && confidenceScore !== null && typeof confidenceScore === 'number' && (
@@ -890,7 +891,7 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
                                 <Text style={{ flex: 1, textAlign: 'right' }}>
                                   {editedValue !== undefined ? (
                                     <span style={{ color: '#1B5E20', fontWeight: 'bold' }}>
-                                      {editedValue} <Tag size="small" color="blue">edited</Tag>
+                          {editedValue} <Tag size="small" color="#23B44F">edited</Tag>
                                     </span>
                                   ) : (
                                     displayValue || 'N/A'

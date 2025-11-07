@@ -86,7 +86,7 @@ function LoginScreen() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      background: 'linear-gradient(135deg, #0D185B 0%,#23B44F  100%)',
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
@@ -96,8 +96,8 @@ function LoginScreen() {
         <Col xs={24} lg={12}>
           <Card style={{ height: '100%' }}>
             <div style={{ textAlign: 'center', marginBottom: 32 }}>
-              <SafetyOutlined style={{ fontSize: 48, color: '#1B5E20', marginBottom: 16 }} />
-              <Title level={2}>VPBank Real Estate System</Title>
+              <SafetyOutlined style={{ fontSize: 48, color: '#23B44F', marginBottom: 16 }} />
+              <Title level={2}style={{ fontWeight: 700 }}>VPBank Real Estate System</Title>
               <Text type="secondary">
                 AI-Powered Collateral Drafting & Document Management
               </Text>
@@ -144,7 +144,11 @@ function LoginScreen() {
                   loading={loading}
                   block
                   icon={<LoginOutlined />}
-                  style={{ height: '45px' }}
+                  style={{
+                    height: '45px',
+                    background: 'linear-gradient(135deg,#23B44F  0%,#0D185B  100%)',
+                    border: 'none'
+                  }}
                 >
                   Sign In
                 </Button>
@@ -156,6 +160,10 @@ function LoginScreen() {
               description="This is a demonstration system. Use the demo accounts provided on the right."
               type="info"
               showIcon
+              style={{
+                backgroundColor: '#DDF8C5',
+                color: '#DDF8C5'
+              }}
             />
           </Card>
         </Col>

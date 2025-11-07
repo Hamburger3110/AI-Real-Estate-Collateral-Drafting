@@ -60,6 +60,53 @@ app.get('/health', async (req, res) => {
   }
 });
 
+// Quick QR test endpoint
+app.post('/qr-test', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'No file uploaded' });
+    }
+    const { detect } = require('./services/qr-detector');
+    const result = await detect(req.file.buffer);
+    return res.status(200).json({ success: true, result });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Synchronous test endpoint for Legal Registration pipeline (no DB write)
+app.post('/legal-test', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'No file uploaded' });
+    }
+    if (req.query && req.query.no_bedrock === '1') {
+      process.env.NO_BEDROCK_TEST = '1';
+    }
+    const { processLegalRegistration } = require('./services/legal-registration-processor');
+    const { detect } = require('./services/qr-detector');
+    const { extractTextWithVietOCR } = require('./services/viet-ocr');
+    const { qaWithBedrockText } = require('./services/bedrock-qa');
+    const { parseExtractionResult } = require('./config/bedrock-config');
+
+    const result = await processLegalRegistration(
+      req.file.buffer,
+      req.file.originalname,
+      null,
+      {
+        detectQr: detect,
+        extractTextWithVietOCR,
+        qaWithBedrockText,
+        parseBedrockResult: parseExtractionResult
+      }
+    );
+
+    return res.status(200).json(result);
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Initialize database on startup
 async function initializeDatabase() {
   console.log('🔄 Initializing database connection...');
