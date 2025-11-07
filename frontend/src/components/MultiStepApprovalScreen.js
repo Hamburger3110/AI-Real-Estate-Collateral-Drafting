@@ -65,8 +65,8 @@ function MultiStepApprovalScreen() {
       status: 'wait'
     },
     {
-      title: 'Final Approval',
-      description: 'Manager approval',
+      title: 'Risk Assessment',
+      description: 'Final risk evaluation',
       status: 'wait'
     }
   ];
@@ -262,7 +262,7 @@ function MultiStepApprovalScreen() {
       
       case 3:
         return (
-          <Card title="Final Approval">
+          <Card title="Risk Assessment">
             <Row gutter={16}>
               <Col span={12}>
                 <Card size="small">
@@ -278,9 +278,9 @@ function MultiStepApprovalScreen() {
                   <Title level={4}>Approval History</Title>
                   <Space direction="vertical">
                     <div>✅ Document Review - Completed</div>
-                    <div>✅ Credit Check - Passed</div>
-                    <div>✅ Legal Review - Approved</div>
-                    <div>⏳ Final Approval - Pending</div>
+                    <div>✅ Credit Analysis - Completed</div>
+                    <div>✅ Legal Review - Completed</div>
+                    <div>⏳ Risk Assessment - Pending</div>
                   </Space>
                 </Card>
               </Col>

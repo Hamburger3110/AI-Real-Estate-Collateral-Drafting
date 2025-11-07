@@ -100,7 +100,7 @@ router.post('/seed', authenticateToken, async (req, res) => {
 // Create contract (protected & validated)
 router.post('/', authenticateToken, async (req, res) => {
   const { document_ids, contract_number, customer_name, property_address, loan_amount, generated_by } = req.body;
-  if (!contract_number || !customer_name || !property_address || loan_amount === undefined || !generated_by) {
+  if (!contract_number || !customer_name || loan_amount === undefined || !generated_by) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
   try {
@@ -294,12 +294,68 @@ router.put('/:id', authenticateToken, async (req, res) => {
 // Delete contract by ID (protected)
 router.delete('/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
+  const client = await pool.connect();
+  
   try {
-    const result = await pool.query('DELETE FROM contracts WHERE contract_id = $1 RETURNING *', [id]);
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Contract not found' });
-    res.json({ message: 'Contract deleted', contract: result.rows[0] });
+    await client.query('BEGIN');
+    
+    // First check if contract exists
+    const contractCheck = await client.query('SELECT * FROM contracts WHERE contract_id = $1', [id]);
+    if (contractCheck.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Contract not found' });
+    }
+    
+    const contract = contractCheck.rows[0];
+    
+    // Safety check: Only allow deletion of draft contracts or contracts in early stages
+    const safeDeletionStatuses = ['draft', 'started', 'processing'];
+    if (contract.status && !safeDeletionStatuses.includes(contract.status.toLowerCase())) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ 
+        error: 'Cannot delete contract', 
+        message: `Contract with status '${contract.status}' cannot be deleted. Only draft or early-stage contracts can be deleted.` 
+      });
+    }
+    
+    // Delete related activity logs first to avoid foreign key constraint
+    await client.query('DELETE FROM activity_logs WHERE contract_id = $1', [id]);
+    
+    // Delete related documents if any
+    await client.query('UPDATE documents SET contract_id = NULL WHERE contract_id = $1', [id]);
+    
+    // Now delete the contract
+    const result = await client.query('DELETE FROM contracts WHERE contract_id = $1 RETURNING *', [id]);
+    
+    await client.query('COMMIT');
+    
+    console.log(`✅ Contract ${id} deleted successfully with all related records`);
+    
+    // Log the deletion activity (if we have user context)
+    if (req.user) {
+      try {
+        const { createActivityLog } = require('../db');
+        await createActivityLog({
+          user_id: req.user.user_id,
+          contract_id: null, // Contract no longer exists
+          action: 'CONTRACT_DELETED',
+          action_detail: `Deleted contract ${contractCheck.rows[0].contract_number || id} and all related records`
+        });
+      } catch (logError) {
+        console.warn('Failed to log contract deletion:', logError);
+      }
+    }
+    
+    res.json({ 
+      message: 'Contract and related records deleted successfully', 
+      contract: result.rows[0] 
+    });
   } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('❌ Error deleting contract:', err);
     res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
   }
 });
 

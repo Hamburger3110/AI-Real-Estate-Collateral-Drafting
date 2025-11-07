@@ -264,8 +264,6 @@ function ActivityLogsScreen() {
         { text: 'Legal Review - Reject', value: 'legal_review_reject' },
         { text: 'Risk Assessment - Approve', value: 'risk_assessment_approve' },
         { text: 'Risk Assessment - Reject', value: 'risk_assessment_reject' },
-        { text: 'Final Approval - Approve', value: 'final_approval_approve' },
-        { text: 'Final Approval - Reject', value: 'final_approval_reject' },
         
         // Workflow Transitions
         { text: 'Workflow Stage Start', value: 'workflow_stage_start' },
@@ -395,8 +393,6 @@ function ActivityLogsScreen() {
                   <Option value="legal_review_reject">Legal Review - Reject</Option>
                   <Option value="risk_assessment_approve">Risk Assessment - Approve</Option>
                   <Option value="risk_assessment_reject">Risk Assessment - Reject</Option>
-                  <Option value="final_approval_approve">Final Approval - Approve</Option>
-                  <Option value="final_approval_reject">Final Approval - Reject</Option>
                   
                   {/* Workflow Transitions */}
                   <Option value="workflow_stage_start">Workflow Stage Start</Option>

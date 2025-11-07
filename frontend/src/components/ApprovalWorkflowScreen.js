@@ -26,7 +26,6 @@ import {
   FileTextOutlined,
   SafetyOutlined,
   BankOutlined,
-  CrownOutlined,
   LoadingOutlined,
 } from "@ant-design/icons";
 import { useAuth } from "../contexts/AuthContext";
@@ -169,7 +168,6 @@ function ApprovalWorkflowScreen() {
       credit_analysis: <BankOutlined />,
       legal_review: <SafetyOutlined />,
       risk_assessment: <ClockCircleOutlined />,
-      final_approval: <CrownOutlined />,
     };
     return icons[stage] || <FileTextOutlined />;
   };
