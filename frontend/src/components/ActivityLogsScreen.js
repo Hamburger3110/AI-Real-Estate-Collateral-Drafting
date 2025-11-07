@@ -34,6 +34,7 @@ import {
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 import { formatLocalDateTime } from '../utils/timeUtils';
+import { buildApiUrl, API_ENDPOINTS } from '../config/api';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -147,7 +148,7 @@ function ActivityLogsScreen() {
       if (contractIdFilter) params.append('contract_id', contractIdFilter);
 
       const response = await fetch(
-        `http://localhost:3001/activity_logs?${params.toString()}`,
+        buildApiUrl(API_ENDPOINTS.ACTIVITY_LOGS, `?${params.toString()}`),
         {
           headers: {
             Authorization: `Bearer ${token}`,

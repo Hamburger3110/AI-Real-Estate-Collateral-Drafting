@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { notification, message } from 'antd';
 import { useAuth } from './AuthContext';
+import { buildApiUrl, API_ENDPOINTS } from '../config/api';
 
 const NotificationContext = createContext();
 
@@ -43,7 +44,7 @@ export const NotificationProvider = ({ children }) => {
 
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:3001/notifications', {
+      const response = await fetch(buildApiUrl(API_ENDPOINTS.NOTIFICATIONS), {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -67,7 +68,7 @@ export const NotificationProvider = ({ children }) => {
     if (!token) return;
 
     try {
-      const response = await fetch(`http://localhost:3001/notifications/${notificationId}/read`, {
+      const response = await fetch(buildApiUrl(API_ENDPOINTS.NOTIFICATIONS, `/${notificationId}/read`), {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -95,7 +96,7 @@ export const NotificationProvider = ({ children }) => {
     if (!token) return;
 
     try {
-      const response = await fetch('http://localhost:3001/notifications/read-all', {
+      const response = await fetch(buildApiUrl(API_ENDPOINTS.NOTIFICATIONS, '/read-all'), {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -122,7 +123,7 @@ export const NotificationProvider = ({ children }) => {
     }
 
     try {
-      const response = await fetch('http://localhost:3001/notifications', {
+      const response = await fetch(buildApiUrl(API_ENDPOINTS.NOTIFICATIONS), {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
