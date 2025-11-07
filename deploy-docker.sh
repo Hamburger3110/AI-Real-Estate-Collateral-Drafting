@@ -32,7 +32,7 @@ case $ACTION in
         
         # Build frontend image
         echo "📦 Building frontend image..."
-        docker build -t ai-real-estate-frontend:latest ./frontend
+        docker build --build-arg REACT_APP_API_BASE_URL=http://3.134.252.155 -t ai-real-estate-frontend:latest ./frontend
         
         echo "✅ Docker images built successfully!"
         docker images | grep ai-real-estate
@@ -77,7 +77,7 @@ case $ACTION in
         # Build images first
         echo "🏗️ Building images locally..."
         docker build -t ai-real-estate-backend:latest ./backend
-        docker build -t ai-real-estate-frontend:latest ./frontend
+        docker build --build-arg REACT_APP_API_BASE_URL=http://3.134.252.155 -t ai-real-estate-frontend:latest ./frontend
         
         # Save images to tar files
         echo "📦 Saving Docker images..."

@@ -1,6 +1,10 @@
 # Multi-stage build for React Frontend
 FROM node:20-alpine as build
 
+# Accept build argument for API URL
+ARG REACT_APP_API_BASE_URL=http://localhost:3001
+ENV REACT_APP_API_BASE_URL=${REACT_APP_API_BASE_URL}
+
 # Set working directory
 WORKDIR /app
 

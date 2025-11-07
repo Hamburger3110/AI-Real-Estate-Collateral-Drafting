@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
+import { buildApiUrl, API_ENDPOINTS } from '../config/api';
 
 /**
  * Custom hook for polling document extraction status
@@ -25,7 +26,7 @@ const useDocumentPolling = (documents, onStatusChange, interval = 5000) => {
 
     for (const doc of processingDocs) {
       try {
-        const response = await fetch(`http://localhost:3001/fptai/extraction-status/${doc.documentId || doc.id}`, {
+        const response = await fetch(buildApiUrl(API_ENDPOINTS.FPTAI, `/extraction-status/${doc.documentId || doc.id}`), {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'

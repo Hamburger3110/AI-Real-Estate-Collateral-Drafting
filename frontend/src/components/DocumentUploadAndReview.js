@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { buildApiUrl, API_ENDPOINTS } from '../config/api';
 
 function DocumentUploadAndReview() {
   const [file, setFile] = useState(null);
@@ -19,18 +20,18 @@ function DocumentUploadAndReview() {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      const uploadRes = await fetch('http://localhost:3001/upload', {
+      const uploadRes = await fetch(buildApiUrl(API_ENDPOINTS.UPLOAD), {
         method: 'POST',
         body: formData,
       });
       if (!uploadRes.ok) throw new Error('Upload failed');
       // Listen for extraction completion via SSE (webhook triggers backend to push event)
-      const eventSource = new window.EventSource('http://localhost:3001/events');
+      const eventSource = new window.EventSource(buildApiUrl(API_ENDPOINTS.EVENTS));
       eventSource.onmessage = async (event) => {
         const { type, documentId } = JSON.parse(event.data);
         if (type === 'textract_complete') {
           // Fetch extracted fields for the completed document
-          const fieldsRes = await fetch('http://localhost:3001/extracted_fields', {
+          const fieldsRes = await fetch(buildApiUrl(API_ENDPOINTS.EXTRACTED_FIELDS), {
             headers: { Authorization: `Bearer ${token}` },
           });
           const fields = await fieldsRes.json();
@@ -58,7 +59,7 @@ function DocumentUploadAndReview() {
   // Update field value via API
   const handleUpdateField = async (field) => {
     try {
-      const res = await fetch(`http://localhost:3001/extracted_fields/${field.field_id}`, {
+      const res = await fetch(buildApiUrl(API_ENDPOINTS.EXTRACTED_FIELDS, `/${field.field_id}`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

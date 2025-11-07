@@ -32,6 +32,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useParams, useNavigate } from "react-router-dom";
 import { formatLocalDate, formatLocalDateTime } from "../utils/timeUtils";
 import { calculateWorkflowProgress } from "../utils/progressUtils";
+import { buildApiUrl, API_ENDPOINTS } from '../config/api';
 
 const { Title, Text, Paragraph } = Typography;
 const { Step } = Steps;
@@ -58,7 +59,7 @@ function ApprovalWorkflowScreen() {
     setLoading(true);
     try {
       const response = await fetch(
-        `http://localhost:3001/approvals/contract/${contractId}`,
+        buildApiUrl(API_ENDPOINTS.APPROVAL_WORKFLOW, `/${contractId}`),
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -126,7 +127,7 @@ function ApprovalWorkflowScreen() {
     setActionLoading(true);
     try {
       const response = await fetch(
-        `http://localhost:3001/approvals/contract/${contractId}/stage/${currentAction.stage}`,
+        buildApiUrl(API_ENDPOINTS.APPROVAL_STAGE, `/${contractId}/stage/${currentAction.stage}`),
         {
           method: "POST",
           headers: {

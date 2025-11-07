@@ -28,6 +28,7 @@ import {
   ReloadOutlined
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
+import { buildApiUrl, API_ENDPOINTS } from '../config/api';
 
 const { Dragger } = Upload;
 const { Text } = Typography;
@@ -171,7 +172,7 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
           const contractNumber = generateContractNumber();
           console.log('Auto-creating draft contract:', contractNumber);
           
-          const response = await fetch('http://localhost:3001/contracts', {
+          const response = await fetch(buildApiUrl(API_ENDPOINTS.CONTRACTS), {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -312,7 +313,7 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
             const result = response.data;
             
             // Link document to contract
-            const linkResponse = await fetch(`http://localhost:3001/documents/${result.document_id}`, {
+            const linkResponse = await fetch(buildApiUrl(API_ENDPOINTS.DOCUMENTS, `/${result.document_id}`), {
               method: 'PUT',
               headers: {
                 'Content-Type': 'application/json',
@@ -329,7 +330,7 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
             }
 
             // Fetch the updated document data with ocr_extracted_json
-            const updatedDocResponse = await fetch(`http://localhost:3001/documents/${result.document_id}`, {
+            const updatedDocResponse = await fetch(buildApiUrl(API_ENDPOINTS.DOCUMENTS, `/${result.document_id}`), {
               method: 'GET',
               headers: {
                 'Authorization': `Bearer ${token}`
@@ -440,7 +441,7 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
         reject(new Error('Upload timeout'));
       };
 
-      xhr.open('POST', 'http://localhost:3001/upload');
+      xhr.open('POST', buildApiUrl(API_ENDPOINTS.UPLOAD));
       xhr.setRequestHeader('Authorization', `Bearer ${token}`);
       
       console.log('Starting upload for:', fileItem.file.name, 'Type:', fileItem.type);
@@ -496,7 +497,7 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
       const refreshPromises = uploadedDocuments.map(async (doc) => {
         if (!doc.document_id) return doc;
 
-        const response = await fetch(`http://localhost:3001/documents/${doc.document_id}`, {
+        const response = await fetch(buildApiUrl(API_ENDPOINTS.DOCUMENTS, `/${doc.document_id}`), {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`
@@ -559,7 +560,7 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
           const [documentId, fieldName] = fieldKey.split('_');
           
           try {
-            const saveResponse = await fetch(`http://localhost:3001/documents/${documentId}/validate`, {
+            const saveResponse = await fetch(buildApiUrl(API_ENDPOINTS.DOCUMENTS, `/${documentId}/validate`), {
               method: 'POST',
               headers: {
                 'Authorization': `Bearer ${token}`,
@@ -590,7 +591,7 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
       }
       
       // Call backend validation endpoint
-      const response = await fetch(`http://localhost:3001/contracts/${contractData.contract_id}/validate`, {
+      const response = await fetch(buildApiUrl(API_ENDPOINTS.CONTRACTS, `/${contractData.contract_id}/validate`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -632,7 +633,7 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
     if (contractData && contractData.contract_id) {
       try {
         console.log('Cleaning up draft contract:', contractData.contract_id);
-        const response = await fetch(`http://localhost:3001/contracts/${contractData.contract_id}`, {
+        const response = await fetch(buildApiUrl(API_ENDPOINTS.CONTRACTS, `/${contractData.contract_id}`), {
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -672,7 +673,7 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
     if (!contractData || !contractData.contract_id) return;
     
     try {
-      const response = await fetch(`http://localhost:3001/contracts/${contractData.contract_id}`, {
+      const response = await fetch(buildApiUrl(API_ENDPOINTS.CONTRACTS, `/${contractData.contract_id}`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

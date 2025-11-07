@@ -117,7 +117,7 @@ export const AuthProvider = ({ children }) => {
       console.log('🔐 Attempting login for:', email);
 
       // Make API call to backend for authentication
-      const response = await fetch('http://localhost:3001/auth/login', {
+      const response = await fetch(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:3001'}/api/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

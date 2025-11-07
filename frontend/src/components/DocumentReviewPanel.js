@@ -13,6 +13,7 @@ import {
   Card
 } from 'antd';
 import { SaveOutlined, WarningOutlined } from '@ant-design/icons';
+import { buildApiUrl, API_ENDPOINTS } from '../config/api';
 
 const { Text, Title } = Typography;
 
@@ -48,7 +49,7 @@ const DocumentReviewPanel = ({ document, onSave, onCancel, token }) => {
       setSaving(true);
 
       // Call API to save corrections
-      const response = await fetch(`http://localhost:3001/fptai/validate-extraction/${document.document_id}`, {
+      const response = await fetch(buildApiUrl(API_ENDPOINTS.VALIDATE_EXTRACTION, `/${document.document_id}`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

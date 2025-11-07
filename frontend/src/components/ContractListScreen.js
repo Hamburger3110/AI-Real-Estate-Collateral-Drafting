@@ -51,6 +51,7 @@ import DocumentReviewPanel from "./DocumentReviewPanel";
 import DocumentFieldReviewModal from "./DocumentFieldReviewModal";
 import { formatLocalDate } from "../utils/timeUtils";
 import { getContractProgress } from "../utils/progressUtils";
+import { buildApiUrl, API_ENDPOINTS } from "../config/api";
 
 const { Option } = Select;
 const { Text } = Typography;
@@ -131,7 +132,7 @@ function ContractListScreen() {
 
       try {
         const workflowResponse = await fetch(
-          `http://localhost:3001/approvals/contract/${contractId}`,
+          buildApiUrl(API_ENDPOINTS.APPROVALS, `/contract/${contractId}`),
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -255,7 +256,7 @@ function ContractListScreen() {
     setLoading(true);
     try {
       console.log("📡 Making API call to fetch contracts...");
-      const response = await fetch("http://localhost:3001/contracts", {
+      const response = await fetch(buildApiUrl(API_ENDPOINTS.CONTRACTS), {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -321,7 +322,7 @@ function ContractListScreen() {
       try {
         // Fetch contract details
         const response = await fetch(
-          `http://localhost:3001/contracts/${contractId}`,
+          buildApiUrl(API_ENDPOINTS.CONTRACTS, `/${contractId}`),
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -341,7 +342,7 @@ function ContractListScreen() {
         // Fetch workflow data for accurate progress calculation
         try {
           const workflowResponse = await fetch(
-            `http://localhost:3001/approvals/contract/${contractId}`,
+            buildApiUrl(API_ENDPOINTS.APPROVALS, `/contract/${contractId}`),
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -427,7 +428,7 @@ function ContractListScreen() {
 
       // Fetch document with extracted fields
       const response = await fetch(
-        `http://localhost:3001/documents/${document.document_id}/fields`,
+        buildApiUrl(API_ENDPOINTS.DOCUMENTS, `/${document.document_id}/fields`),
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -455,7 +456,7 @@ function ContractListScreen() {
   const handleSaveFieldReview = async (reviewData) => {
     try {
       const response = await fetch(
-        `http://localhost:3001/documents/${reviewData.document_id}/validate`,
+        buildApiUrl(API_ENDPOINTS.DOCUMENTS, `/${reviewData.document_id}/validate`),
         {
           method: "POST",
           headers: {
@@ -525,7 +526,7 @@ function ContractListScreen() {
 
             // Link document to contract
             const linkResponse = await fetch(
-              `http://localhost:3001/documents/${result.document_id}`,
+              buildApiUrl(API_ENDPOINTS.DOCUMENTS, `/${result.document_id}`),
               {
                 method: "PUT",
                 headers: {
@@ -584,7 +585,7 @@ function ContractListScreen() {
         message.error(`Upload timeout for ${fileItem.file.name}`);
       };
 
-      xhr.open("POST", "http://localhost:3001/upload");
+      xhr.open("POST", buildApiUrl(API_ENDPOINTS.UPLOAD));
       xhr.setRequestHeader("Authorization", `Bearer ${token}`);
       xhr.send(formData);
     } catch (error) {
@@ -699,7 +700,7 @@ function ContractListScreen() {
   const handleEditContract = async (values) => {
     try {
       const response = await fetch(
-        `http://localhost:3001/contracts/${selectedContract.id}`,
+        buildApiUrl(API_ENDPOINTS.CONTRACTS, `/${selectedContract.id}`),
         {
           method: "PUT",
           headers: {
@@ -774,7 +775,7 @@ function ContractListScreen() {
   const updateContractStatus = async (contractId, newStatus) => {
     try {
       const response = await fetch(
-        `http://localhost:3001/contracts/${contractId}`,
+        buildApiUrl(API_ENDPOINTS.CONTRACTS, `/${contractId}`),
         {
           method: "PUT",
           headers: {

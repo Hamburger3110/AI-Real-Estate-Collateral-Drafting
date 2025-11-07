@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { buildApiUrl, API_ENDPOINTS } from '../config/api';
 
 function ContractsList() {
   const [contracts, setContracts] = useState([]);
@@ -8,7 +9,7 @@ function ContractsList() {
   useEffect(() => {
     async function fetchContracts() {
       try {
-        const res = await fetch('http://localhost:3001/contracts', {
+        const res = await fetch(buildApiUrl(API_ENDPOINTS.CONTRACTS), {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (!res.ok) throw new Error('Failed to fetch contracts');
