@@ -19,7 +19,22 @@ AWS.config.update({
 const s3 = new AWS.S3();
 const textract = new AWS.Textract();
 
-app.use(cors());
+// Configure CORS to allow requests from frontend
+const corsOptions = {
+  origin: [
+    'http://localhost:3000',
+    'http://localhost:80',
+    'http://3.134.252.155',
+    'http://3.134.252.155:3000',
+    'http://3.134.252.155:80',
+    process.env.FRONTEND_URL
+  ].filter(Boolean), // Remove any undefined values
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id']
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 
 app.use('/auth', require('./routes/auth'));
