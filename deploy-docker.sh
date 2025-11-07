@@ -48,16 +48,15 @@ case $ACTION in
             exit 1
         fi
         
-        # Start services
-        docker-compose up -d
+        # Use development compose file for local development
+        docker-compose -f docker-compose.dev.yml up -d
         
         echo "✅ Application started!"
         echo "🌐 Frontend: http://localhost:3000"
-        echo "🔧 Backend: http://localhost:5000"
-        echo "🌍 Nginx: http://localhost:80"
+        echo "🔧 Backend: http://localhost:3001 (mapped from container port 5000)"
         echo ""
         echo "📊 Container status:"
-        docker-compose ps
+        docker-compose -f docker-compose.dev.yml ps
         ;;
         
     "deploy")
@@ -163,8 +162,10 @@ ENDSSH
     "clean")
         echo "🧹 Cleaning up Docker resources..."
         
-        # Stop and remove containers
+        # Stop and remove containers from both compose files
         docker-compose down 2>/dev/null || true
+        docker-compose -f docker-compose.dev.yml down 2>/dev/null || true
+        docker-compose -f docker-compose.prod.yml down 2>/dev/null || true
         
         # Remove images
         docker rmi ai-real-estate-backend:latest 2>/dev/null || true

@@ -385,7 +385,7 @@ async function createContract(data) {
   try {
     const result = await client.query(
       'INSERT INTO contracts (contract_number, customer_name, property_address, loan_amount, generated_pot_uri, generated_by, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
-      [data.contract_number, data.customer_name, data.property_address, data.loan_amount, data.generated_pot_uri, data.generated_by, data.status || 'started']
+      [data.contract_number, data.customer_name, data.property_address || null, data.loan_amount, data.generated_pot_uri, data.generated_by, data.status || 'started']
     );
     return result.rows[0];
   } finally {

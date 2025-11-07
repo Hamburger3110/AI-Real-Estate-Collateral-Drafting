@@ -95,7 +95,6 @@ function ContractListScreen() {
         'credit_analysis': 'Credit Analysis',
         'legal_review': 'Legal Review',
         'risk_assessment': 'Risk Assessment',
-        'final_approval': 'Final Approval',
         'completed': 'Completed'
       };
       return stageStatusMap[currentApprovalStage] || 'Under Review';
@@ -899,25 +898,25 @@ function ContractListScreen() {
         </div>
       ),
     },
-    {
-      title: "Property Address",
-      dataIndex: "propertyAddress",
-      key: "propertyAddress",
-      width: 250,
-      ellipsis: true,
-      render: (text) => (
-        <div style={{ wordBreak: "break-word", whiteSpace: "normal" }}>
-          {text || "N/A"}
-        </div>
-      ),
-    },
     // {
-    //   title: 'Loan Amount',
-    //   dataIndex: 'loanAmount',
-    //   key: 'loanAmount',
-    //   sorter: (a, b) => a.loanAmount - b.loanAmount,
-    //   render: (amount) => amount ? `$${amount.toLocaleString()}` : 'N/A'
+    //   title: "Property Address",
+    //   dataIndex: "propertyAddress",
+    //   key: "propertyAddress",
+    //   width: 250,
+    //   ellipsis: true,
+    //   render: (text) => (
+    //     <div style={{ wordBreak: "break-word", whiteSpace: "normal" }}>
+    //       {text || "N/A"}
+    //     </div>
+    //   ),
     // },
+    {
+      title: 'Loan Amount',
+      dataIndex: 'loanAmount',
+      key: 'loanAmount',
+      sorter: (a, b) => a.loanAmount - b.loanAmount,
+      render: (amount) => amount ? `$${amount.toLocaleString()}` : 'N/A'
+    },
     // {
     //   title: 'Document Type',
     //   dataIndex: 'documentType',

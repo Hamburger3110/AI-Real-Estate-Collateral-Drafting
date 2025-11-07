@@ -138,9 +138,27 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, '0');
     const day = String(now.getDate()).padStart(2, '0');
-    const time = String(now.getHours()).padStart(2, '0') + String(now.getMinutes()).padStart(2, '0');
-    return `CT-${year}${month}${day}-${time}`;
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    const milliseconds = String(now.getMilliseconds()).padStart(3, '0');
+    return `CT-${year}${month}${day}-${hours}${minutes}${seconds}${milliseconds}`;
   };
+
+  // Reset state when modal opens to prevent conflicts
+  React.useEffect(() => {
+    if (visible && !contractData) {
+      // Reset all state to ensure clean start
+      setCurrentStep(0);
+      setFileList([]);
+      setUploadedDocuments([]);
+      setUploadProgress({});
+      setEditableExtractedData({});
+      setEditingDocument(null);
+      contractForm.resetFields();
+      documentForm.resetFields();
+    }
+  }, [visible, contractData, contractForm, documentForm]);
 
   // Auto-create draft contract when modal opens
   React.useEffect(() => {
@@ -161,8 +179,7 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
             },
             body: JSON.stringify({
               contract_number: contractNumber,
-              customer_name: 'Draft Contract',
-              property_address: 'To be updated',
+              customer_name: 'CUSTOMER',
               loan_amount: 0,
               generated_by: user.user_id
             })
@@ -193,6 +210,16 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
 
     autoCreateDraftContract();
   }, [visible, contractData, autoCreating, token, user, onCancel]);
+
+  // Update form when contract data changes
+  React.useEffect(() => {
+    if (contractData && contractForm) {
+      contractForm.setFieldsValue({
+        customer_name: contractData.customer_name || '',
+        loan_amount: contractData.loan_amount || undefined
+      });
+    }
+  }, [contractData, contractForm]);
 
   const steps = [
     {
@@ -578,8 +605,20 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
 
       const result = await response.json();
       message.success(`Contract created successfully! ${result.document_count} document(s) verified and attached. Approval workflow has been started.`);
+      
+      // Reset form state without deleting the contract (successful completion)
+      setCurrentStep(0);
+      setContractData(null);
+      setFileList([]);
+      setUploadedDocuments([]);
+      setUploadProgress({});
+      setAutoCreating(false);
+      setEditableExtractedData({});
+      setEditingDocument(null);
+      contractForm.resetFields();
+      documentForm.resetFields();
+      
       onSuccess();
-      handleCancel();
     } catch (error) {
       console.error('Contract validation error:', error);
       message.error(`Failed to complete contract: ${error.message}`);
@@ -588,7 +627,31 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
     }
   };
 
-  const handleCancel = () => {
+  const handleCancel = async () => {
+    // Clean up draft contract if it exists and hasn't been completed
+    if (contractData && contractData.contract_id) {
+      try {
+        console.log('Cleaning up draft contract:', contractData.contract_id);
+        const response = await fetch(`http://localhost:3001/contracts/${contractData.contract_id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (response.ok) {
+          console.log('✅ Draft contract cleaned up successfully');
+        } else {
+          const errorData = await response.json();
+          console.warn('Draft contract cleanup failed:', errorData.error);
+        }
+      } catch (error) {
+        console.warn('Failed to clean up draft contract:', error);
+        // Don't show error to user as this is cleanup
+      }
+    }
+
     setCurrentStep(0);
     setContractData(null);
     setFileList([]);
@@ -604,8 +667,79 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
 
 
 
+  // Handle contract details update
+  const handleContractDetailsUpdate = async (values) => {
+    if (!contractData || !contractData.contract_id) return;
+    
+    try {
+      const response = await fetch(`http://localhost:3001/contracts/${contractData.contract_id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(values)
+      });
+
+      if (response.ok) {
+        const updatedContract = await response.json();
+        setContractData(updatedContract);
+        message.success('Contract details updated');
+      }
+    } catch (error) {
+      console.error('Failed to update contract details:', error);
+    }
+  };
+
   const renderDocumentUpload = () => (
     <div>
+      <Card title="Contract Details" style={{ marginBottom: 16 }}>
+        <Form
+          form={contractForm}
+          layout="vertical"
+          initialValues={{
+            customer_name: contractData?.customer_name || '',
+            loan_amount: contractData?.loan_amount || undefined
+          }}
+
+        >
+          <Form.Item
+            name="customer_name"
+            label="Customer Name"
+            rules={[
+              { required: true, message: 'Please enter customer name' },
+              { min: 2, message: 'Customer name must be at least 2 characters' }
+            ]}
+          >
+            <Input placeholder="Enter customer full name" />
+          </Form.Item>
+
+          <Form.Item
+            name="loan_amount"
+            label="Loan Amount"
+            rules={[
+              { required: true, message: 'Please enter loan amount' },
+              { 
+                validator: (_, value) => {
+                  if (!value || value <= 0) {
+                    return Promise.reject(new Error('Loan amount must be greater than 0'));
+                  }
+                  return Promise.resolve();
+                }
+              }
+            ]}
+          >
+            <InputNumber
+              placeholder="Enter loan amount"
+              style={{ width: '100%' }}
+              formatter={value => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+              parser={value => value.replace(/\$\s?|(,*)/g, '')}
+              min={0}
+            />
+          </Form.Item>
+        </Form>
+      </Card>
+
       <Card title="Upload Supporting Documents" style={{ marginBottom: 16 }}>
         <Dragger {...uploadProps}>
           <p className="ant-upload-drag-icon">
@@ -690,13 +824,36 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
         <Button 
           type="primary" 
           onClick={async () => {
-            await refreshDocumentData();
-            setCurrentStep(1);
+            try {
+              // First check if documents are uploaded
+              const uploadedDocs = uploadedDocuments.filter(doc => doc.document_id);
+              if (uploadedDocs.length === 0) {
+                message.warning('Please upload at least one document');
+                return;
+              }
+
+              // Then validate contract form
+              const formValues = await contractForm.validateFields();
+              
+              // Save the validated form data
+              await handleContractDetailsUpdate(formValues);
+              
+              // Refresh document data and proceed
+              await refreshDocumentData();
+              setCurrentStep(1);
+            } catch (error) {
+              if (error.errorFields && error.errorFields.length > 0) {
+                message.error('Please fill in all required contract details');
+              } else {
+                console.error('Error proceeding to review:', error);
+                message.error('Failed to proceed to review');
+              }
+            }
           }}
           disabled={uploadedDocuments.filter(doc => doc.document_id).length === 0}
         >
           {uploadedDocuments.filter(doc => doc.document_id).length === 0 
-            ? 'Upload Documents to Continue' 
+            ? 'Complete Contract Details & Upload Documents' 
             : 'Continue to Review'
           }
         </Button>
@@ -711,7 +868,6 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
           <div>
             <Text strong>Contract Number:</Text> {contractData.contract_number}<br />
             <Text strong>Customer:</Text> {contractData.customer_name}<br />
-            <Text strong>Property:</Text> {contractData.property_address}<br />
             <Text strong>Loan Amount:</Text> ${contractData.loan_amount?.toLocaleString()}<br />
             <Text strong>Status:</Text> <Tag color="blue">{contractData.status}</Tag><br />
             <Text strong>Approval Stage:</Text> <Tag color="orange">{contractData.current_approval_stage}</Tag>

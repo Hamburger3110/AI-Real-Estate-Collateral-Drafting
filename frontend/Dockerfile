@@ -13,7 +13,7 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Update API URLs for production
+# Update API URLs for production (only if environment variable is set)
 RUN chmod +x update-api-urls.sh && ./update-api-urls.sh
 
 # Set environment variables for build optimization

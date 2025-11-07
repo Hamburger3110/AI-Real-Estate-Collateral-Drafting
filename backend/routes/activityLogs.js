@@ -39,7 +39,7 @@ router.get('/', authenticateToken, async (req, res) => {
       FROM activity_logs al
       LEFT JOIN users u ON al.user_id = u.user_id
       LEFT JOIN documents d ON al.document_id = d.document_id
-      LEFT JOIN contracts c ON d.contract_id = c.contract_id
+      LEFT JOIN contracts c ON al.contract_id = c.contract_id
     `;
     
     let conditions = [];
@@ -132,8 +132,8 @@ router.get('/contract/:contractId', authenticateToken, async (req, res) => {
       FROM activity_logs al
       LEFT JOIN users u ON al.user_id = u.user_id
       LEFT JOIN documents d ON al.document_id = d.document_id
-      LEFT JOIN contracts c ON d.contract_id = c.contract_id
-      WHERE c.contract_id = $1
+      LEFT JOIN contracts c ON al.contract_id = c.contract_id
+      WHERE al.contract_id = $1
       ORDER BY al.timestamp DESC
       LIMIT $2 OFFSET $3
     `;
@@ -144,9 +144,7 @@ router.get('/contract/:contractId', authenticateToken, async (req, res) => {
     const countQuery = `
       SELECT COUNT(*) 
       FROM activity_logs al
-      LEFT JOIN documents d ON al.document_id = d.document_id
-      LEFT JOIN contracts c ON d.contract_id = c.contract_id
-      WHERE c.contract_id = $1
+      WHERE al.contract_id = $1
     `;
     
     const countResult = await pool.query(countQuery, [contractId]);

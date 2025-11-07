@@ -102,7 +102,6 @@ function ApprovalDashboard() {
       credit_analysis: <CheckCircleOutlined />,
       legal_review: <ExclamationCircleOutlined />,
       risk_assessment: <ClockCircleOutlined />,
-      final_approval: <CheckCircleOutlined />,
     };
     return icons[stage] || <FileTextOutlined />;
   };
