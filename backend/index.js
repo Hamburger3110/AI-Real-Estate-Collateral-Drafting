@@ -112,6 +112,7 @@ app.post('/upload', upload.single('file'), async (req, res) => {
     // Generate unique filename with contract_id if provided
     const timestamp = Date.now();
     const sanitizedName = originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+    // Store under a single contract-based prefix; document type is in S3 metadata
     const s3Key = contract_id 
       ? `documents/${contract_id}/${timestamp}_${sanitizedName}`
       : `documents/${timestamp}_${sanitizedName}`;

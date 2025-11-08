@@ -1,0 +1,121 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Helper Lambdas for Legal Registration QR-first processing (invoked by existing SQS worker)
+
+Parameters:
+  BucketName:
+    Type: String
+    Default: document-upload-vp
+  AwsRegion:
+    Type: String
+    Default: us-east-2
+  BedrockModelId:
+    Type: String
+    Default: anthropic.claude-3-sonnet-20240229-v1:0
+  QrDetectorImageUri:
+    Type: String
+    Description: ECR image URI for qr-detector container
+  VietOCRImageUri:
+    Type: String
+    Description: ECR image URI for vietocr-processor container
+  # Optional: provide if you want Lambdas in VPC; otherwise omitted
+  VpcSubnetIds:
+    Type: CommaDelimitedList
+    Default: ""
+  VpcSecurityGroupIds:
+    Type: CommaDelimitedList
+    Default: ""
+
+Globals:
+  Function:
+    Timeout: 60
+    MemorySize: 1024
+    Tracing: Active
+    Environment:
+      Variables:
+        S3_BUCKET_NAME: !Ref BucketName
+
+Resources:
+  QrDetector:
+    Type: AWS::Serverless::Function
+    Properties:
+      PackageType: Image
+      ImageUri: !Ref QrDetectorImageUri
+      Architectures: [x86_64]
+      MemorySize: 2048
+      Timeout: 30
+      Policies:
+        - S3ReadPolicy:
+            BucketName: !Ref BucketName
+
+  QrDecoder:
+    Type: AWS::Serverless::Function
+    Properties:
+      Runtime: nodejs20.x
+      Handler: index.handler
+      CodeUri: ../lambdas/qr-decoder/
+      Timeout: 30
+      Policies:
+        - S3ReadPolicy:
+            BucketName: !Ref BucketName
+
+  VietOCR:
+    Type: AWS::Serverless::Function
+    Properties:
+      PackageType: Image
+      ImageUri: !Ref VietOCRImageUri
+      Architectures: [x86_64]
+      MemorySize: 3008
+      EphemeralStorage:
+        Size: 10240
+      Timeout: 120
+      Policies:
+        - S3ReadPolicy:
+            BucketName: !Ref BucketName
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+
+  BedrockQA:
+    Type: AWS::Serverless::Function
+    Properties:
+      Runtime: nodejs20.x
+      Handler: index.handler
+      CodeUri: ../lambdas/bedrock-qa/
+      Timeout: 60
+      Environment:
+        Variables:
+          BEDROCK_MODEL_ID: !Ref BedrockModelId
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+                - bedrock:InvokeModelWithResponseStream
+              Resource: "*"
+
+  ResultSaver:
+    Type: AWS::Serverless::Function
+    Properties:
+      Runtime: nodejs20.x
+      Handler: index.handler
+      CodeUri: ../lambdas/result-saver/
+      Timeout: 30
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - ssm:GetParameter
+                - secretsmanager:GetSecretValue
+              Resource: "*"
+
+Outputs:
+  QrDetectorArn:
+    Value: !GetAtt QrDetector.Arn
+  QrDecoderArn:
+    Value: !GetAtt QrDecoder.Arn
+  VietOCRArn:
+    Value: !GetAtt VietOCR.Arn
+  BedrockQAArn:
+    Value: !GetAtt BedrockQA.Arn
+  ResultSaverArn:
+    Value: !GetAtt ResultSaver.Arn
+
