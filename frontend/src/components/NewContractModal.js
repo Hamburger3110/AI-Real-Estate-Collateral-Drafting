@@ -697,23 +697,15 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
           // Check if response is a file download
           const contentType = generateResponse.headers.get('content-type');
           if (contentType && contentType.includes('application/vnd.openxmlformats-officedocument.wordprocessingml.document')) {
-            // It's a file download - create download link
-            const blob = await generateResponse.blob();
-            const url = window.URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `contract_${contractData.contract_number}_${Date.now()}.docx`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(url);
+            // File generated successfully - consume the blob but don't download
+            await generateResponse.blob();
             
             message.success({
               content: (
                 <div>
                   <div style={{ fontWeight: 'bold' }}>📄 Contract Document Generated!</div>
                   <div style={{ fontSize: '12px', marginTop: '4px' }}>
-                    Comprehensive contract document downloaded successfully
+                    Comprehensive contract document generated and stored successfully
                   </div>
                 </div>
               ),
@@ -766,7 +758,7 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
             <div style={{ fontSize: '14px' }}>
               Contract {contractData.contract_number} has been created with {result.document_count} document(s) attached.
               <br />
-              ✅ Contract document generated and downloaded
+              ✅ Contract document generated and stored
               <br />
               🔄 Approval workflow has been started
             </div>

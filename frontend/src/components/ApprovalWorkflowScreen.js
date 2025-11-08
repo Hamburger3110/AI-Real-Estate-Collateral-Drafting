@@ -274,8 +274,7 @@ function ApprovalWorkflowScreen() {
               </Space>
             </Card>
 
-            {/* Contract Documents */}
-            {contract && (
+            {/* {contract && (
               <Card title="Generated Contract" style={{ marginBottom: "24px" }}>
                 <Space direction="vertical" style={{ width: "100%" }}>
                   {contract.pdf_url && (
@@ -314,7 +313,7 @@ function ApprovalWorkflowScreen() {
                   )}
                 </Space>
               </Card>
-            )}
+            )} */}
 
             <Card title="Progress Overview">
               <Statistic

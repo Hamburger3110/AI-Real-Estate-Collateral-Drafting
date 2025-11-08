@@ -332,7 +332,6 @@ class ContractGenerator {
       let updateQuery = `
         UPDATE contracts 
         SET 
-          status = 'generated',
           generated_at = CURRENT_TIMESTAMP,
           updated_at = CURRENT_TIMESTAMP`;
       
@@ -359,7 +358,7 @@ class ContractGenerator {
       
       await client.query(updateQuery, updateParams);
       
-      console.log(`✅ Updated contract ${contractId} status to 'generated'`);
+      console.log(`✅ Updated contract ${contractId} generation timestamps and URLs`);
       
       if (s3Upload && s3Upload.success) {
         console.log(`📎 Contract URL stored in database`);

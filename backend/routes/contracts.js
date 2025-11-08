@@ -511,13 +511,13 @@ router.get('/:contractId/document/:type', authenticateToken, async (req, res) =>
     
     const contract = contractResult.rows[0];
     
-    // Check if contract has been generated
-    if (contract.status !== 'generated' && contract.status !== 'approved') {
-      return res.status(400).json({ error: 'Contract has not been generated yet' });
-    }
-    
     // Get the appropriate URL
     const documentUrl = type === 'pdf' ? contract.pdf_url : contract.docx_url;
+    
+    // Check if contract document has been generated
+    if (!documentUrl) {
+      return res.status(400).json({ error: 'Contract document has not been generated yet' });
+    }
     
     if (!documentUrl) {
       return res.status(404).json({ error: `${type.toUpperCase()} document not found for this contract` });
