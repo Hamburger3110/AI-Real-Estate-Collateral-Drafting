@@ -37,21 +37,30 @@ if (process.env.AWS_PROFILE) {
 const s3 = new AWS.S3();
 const textract = new AWS.Textract();
 
-app.use(cors());
+// Configure CORS to allow all origins
+const corsOptions = {
+  origin: true, // Allow all origins
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id']
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 
-app.use('/auth', require('./routes/auth'));
-app.use('/documents', require('./routes/documents'));
-app.use('/extracted_fields', require('./routes/extractedFields'));
-app.use('/contracts', require('./routes/contracts'));
-app.use('/approvals', require('./routes/approvals'));
-app.use('/migrations', require('./routes/migrations'));
-app.use('/activity_logs', require('./routes/activityLogs'));
-app.use('/test', require('./routes/test-signed-urls'));
-app.use('/events', eventsRouter);
-app.use('/webhook', require('./routes/webhook'));
-app.use('/fptai', require('./routes/fptai'));
-app.use('/notifications', require('./routes/notifications'));
+// Add /api prefix to all routes
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/documents', require('./routes/documents'));
+app.use('/api/extracted_fields', require('./routes/extractedFields'));
+app.use('/api/contracts', require('./routes/contracts'));
+app.use('/api/approvals', require('./routes/approvals'));
+app.use('/api/migrations', require('./routes/migrations'));
+app.use('/api/activity_logs', require('./routes/activityLogs'));
+app.use('/api/test', require('./routes/test-signed-urls'));
+app.use('/api/events', eventsRouter);
+app.use('/api/webhook', require('./routes/webhook'));
+app.use('/api/fptai', require('./routes/fptai'));
+app.use('/api/notifications', require('./routes/notifications'));
 
 // Health check endpoint
 app.get('/health', async (req, res) => {
@@ -167,7 +176,7 @@ initializeDatabase().catch(err => {
 });
 
 // Enhanced file upload endpoint with S3 and OCR integration
-app.post('/upload', upload.single('file'), async (req, res) => {
+app.post('/api/upload', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });

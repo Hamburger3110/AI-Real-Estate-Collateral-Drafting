@@ -32,6 +32,7 @@ import {
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { buildApiUrl, API_ENDPOINTS } from '../config/api';
 
 const { Sider, Content, Header } = Layout;
 const { Title, Text } = Typography;
@@ -110,8 +111,8 @@ function DocumentUploadScreen() {
         formData.append('user_id', user?.id || 1);
         
         console.log(`📤 Uploading file ${i + 1}/${fileList.length}: ${file.name}`);
-        
-        const response = await fetch('http://localhost:3001/upload', {
+
+        const response = await fetch(buildApiUrl(API_ENDPOINTS.UPLOAD), {
           method: 'POST',
           body: formData,
         });
