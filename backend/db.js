@@ -451,19 +451,19 @@ async function seedDemoUsers() {
         cognito_id: 'admin-demo-1'
       },
       {
-        full_name: 'Sarah Johnson',
+        full_name: 'Nguyen Minh Anh',
         email: 'credit.officer@vpbank.com',
         role: 'CREDIT_OFFICER',
         cognito_id: 'credit-demo-2'
       },
       {
-        full_name: 'Lisa Chen',
+        full_name: 'Vu Thi Thanh Hien',
         email: 'legal.officer@vpbank.com',
         role: 'LEGAL_OFFICER',
         cognito_id: 'legal-demo-3'
       },
       {
-        full_name: 'Mike Wilson',
+        full_name: 'Le Quoc Anh',
         email: 'manager@vpbank.com',
         role: 'MANAGER',
         cognito_id: 'manager-demo-4'

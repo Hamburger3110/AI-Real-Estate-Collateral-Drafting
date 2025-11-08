@@ -243,7 +243,7 @@ function ApprovalWorkflowScreen() {
                   <Text strong>Loan Amount:</Text>
                   <br />
                   <Text>
-                    ${parseFloat(contract.loan_amount).toLocaleString()}
+                    {parseFloat(contract.loan_amount).toLocaleString()} ₫
                   </Text>
                 </div>
                 <div>

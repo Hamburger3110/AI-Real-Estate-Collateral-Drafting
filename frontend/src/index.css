@@ -84,10 +84,18 @@ code {
   border-color: transparent !important;
 }
 
-/* Upload page submit button hover shadow */
+/* Upload page submit button - default gradient state */
+.vp-upload-submit.ant-btn-primary {
+  background: linear-gradient(135deg, #23B44F 0%, #0D185B 100%) !important;
+  border-color: transparent !important;
+}
+
+/* Upload page submit button hover - darker gradient with shadow */
 .vp-upload-submit.ant-btn-primary:hover,
 .vp-upload-submit.ant-btn-primary:focus {
-  box-shadow: 0 4px 12px rgba(35, 180, 79, 0.3) !important;
+  background: linear-gradient(135deg, #1A8A3A 0%, #080D2E 100%) !important;
+  border-color: transparent !important;
+  transform: translateY(-1px);
 }
 
 /* Upload (Dragger) green theme overrides */

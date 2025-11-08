@@ -56,9 +56,9 @@ router.get('/profile', authenticateToken, async (req, res) => {
     // For demo purposes, return mock user data based on token
     const demoUsers = {
       1: { id: 1, email: 'admin@vpbank.com', name: 'System Administrator', role: 'ADMIN' },
-      2: { id: 2, email: 'credit.officer@vpbank.com', name: 'Sarah Johnson', role: 'CREDIT_OFFICER' },
-      3: { id: 3, email: 'legal.officer@vpbank.com', name: 'Lisa Chen', role: 'LEGAL_OFFICER' },
-      4: { id: 4, email: 'manager@vpbank.com', name: 'Mike Wilson', role: 'MANAGER' }
+      2: { id: 2, email: 'credit.officer@vpbank.com', name: 'Nguyen Minh Anh', role: 'CREDIT_OFFICER' },
+      3: { id: 3, email: 'legal.officer@vpbank.com', name: 'Vu Thi Thanh Hien', role: 'LEGAL_OFFICER' },
+      4: { id: 4, email: 'manager@vpbank.com', name: 'Le Quoc Anh', role: 'MANAGER' }
     };
 
     // Extract user ID from token (assuming it's demo-token-{id})

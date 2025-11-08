@@ -267,8 +267,8 @@ const DocumentFieldReviewModal = ({
                     style={{ width: '100%' }}
                     placeholder={`Enter ${field.field_name}`}
                     onChange={(value) => handleFieldChange(field.field_name, value)}
-                    formatter={value => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                    parser={value => value.replace(/\$\s?|(,*)/g, '')}
+                    formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + ' ₫'}
+                    parser={value => value.replace(/\s?₫|(,*)/g, '')}
                   />
                 ) : field.field_name?.toLowerCase().includes('date') ? (
                   <Input

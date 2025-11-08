@@ -749,7 +749,7 @@ function ContractListScreen() {
         Contract Number: ${record.contractNumber}
         Customer Name: ${record.customerName}
         Property Address: ${record.propertyAddress}
-        Loan Amount: $${record.loanAmount?.toLocaleString()}
+        Loan Amount: {record.loanAmount?.toLocaleString()} ₫
         Status: ${record.status}
         Created Date: ${record.createdDate}
         Assigned To: ${record.assignedTo}
@@ -1195,7 +1195,7 @@ function ContractListScreen() {
                   </Space>
                 }
               >
-                ${selectedContract.loanAmount?.toLocaleString()}
+                {selectedContract.loanAmount?.toLocaleString()} ₫
               </Descriptions.Item>
               <Descriptions.Item
                 label={
@@ -1513,9 +1513,8 @@ function ContractListScreen() {
           >
             <Input
               type="number"
-              prefix={<DollarOutlined />}
               placeholder="Enter loan amount"
-              addonBefore="$"
+              addonAfter="₫"
             />
           </Form.Item>
 

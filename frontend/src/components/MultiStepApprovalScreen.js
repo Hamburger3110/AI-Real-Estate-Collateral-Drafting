@@ -78,7 +78,7 @@ function MultiStepApprovalScreen() {
       type: 'Ownership Document',
       status: 'Verified',
       uploadDate: '2024-10-15',
-      reviewer: 'Sarah Johnson'
+      reviewer: 'Nguyen Minh Anh'
     },
     {
       id: 2,
@@ -86,7 +86,7 @@ function MultiStepApprovalScreen() {
       type: 'Financial Document',
       status: 'Under Review',
       uploadDate: '2024-10-16',
-      reviewer: 'Mike Wilson'
+      reviewer: 'Le Quoc Anh'
     },
     {
       id: 3,
@@ -241,7 +241,7 @@ function MultiStepApprovalScreen() {
               <Form form={form} layout="vertical">
                 <Form.Item label="Legal Officer" name="legalOfficer">
                   <Select placeholder="Select legal officer">
-                    <Option value="lisa">Lisa Chen - Senior Legal Officer</Option>
+                    <Option value="lisa">Vu Thi Thanh Hien - Senior Legal Officer</Option>
                     <Option value="david">David Park - Legal Counsel</Option>
                   </Select>
                 </Form.Item>
@@ -269,7 +269,7 @@ function MultiStepApprovalScreen() {
                   <Title level={4}>Contract Summary</Title>
                   <p><strong>Customer:</strong> {approvalData.customerName}</p>
                   <p><strong>Property:</strong> {approvalData.propertyAddress}</p>
-                  <p><strong>Loan Amount:</strong> ${approvalData.loanAmount.toLocaleString()}</p>
+                  <p><strong>Loan Amount:</strong> {approvalData.loanAmount.toLocaleString()} ₫</p>
                   <p><strong>Contract ID:</strong> {approvalData.contractId}</p>
                 </Card>
               </Col>
