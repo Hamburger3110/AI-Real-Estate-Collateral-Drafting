@@ -47,19 +47,19 @@ function LoginScreen() {
       email: 'credit.officer@vpbank.com',
       password: 'password123',
       role: 'Credit Officer',
-      name: 'Sarah Johnson'
+      name: 'Nguyen Minh Anh'
     },
     {
       email: 'legal.officer@vpbank.com',
       password: 'password123',
       role: 'Legal Officer',
-      name: 'Lisa Chen'
+      name: 'Vu Thi Thanh Hien'
     },
     {
       email: 'manager@vpbank.com',
       password: 'password123',
       role: 'Manager',
-      name: 'Mike Wilson'
+      name: 'Le Quoc Anh'
     }
   ];
 

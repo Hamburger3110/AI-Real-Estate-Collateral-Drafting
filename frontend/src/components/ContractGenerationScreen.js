@@ -269,7 +269,7 @@ function ContractGenerationScreen() {
                   {contract.property_address}
                 </Descriptions.Item>
                 <Descriptions.Item label="Loan Amount">
-                  ${contract.loan_amount?.toLocaleString()}
+                  {contract.loan_amount?.toLocaleString()} ₫
                 </Descriptions.Item>
                 <Descriptions.Item label="Status">
                   <Tag color="blue">{contract.status}</Tag>

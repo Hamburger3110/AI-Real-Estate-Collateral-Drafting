@@ -143,7 +143,7 @@ function ApprovalDashboard() {
       title: "Loan Amount",
       dataIndex: "loan_amount",
       key: "loan_amount",
-      render: (amount) => `$${parseFloat(amount).toLocaleString()}`,
+      render: (amount) => `${parseFloat(amount).toLocaleString()} ₫`,
     },
     {
       title: "Current Stage",

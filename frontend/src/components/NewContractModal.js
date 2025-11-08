@@ -904,8 +904,8 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
             <InputNumber
               placeholder="Enter loan amount"
               style={{ width: '100%' }}
-              formatter={value => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-              parser={value => value.replace(/\$\s?|(,*)/g, '')}
+              formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + ' ₫'}
+              parser={value => value.replace(/\s?₫|(,*)/g, '')}
               min={0}
             />
           </Form.Item>
@@ -987,6 +987,11 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
             onClick={handleUploadAll}
             disabled={fileList.filter(item => item.status === 'ready').length === 0}
             loading={fileList.some(item => item.status === 'uploading')}
+            className="vp-upload-submit"
+            style={{
+              background: 'linear-gradient(135deg, #23B44F 0%, #0D185B 100%)',
+              border: 'none',
+            }}
           >
             {fileList.some(item => item.status === 'uploading') 
               ? 'Uploading...' 
@@ -1027,6 +1032,12 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
             }
           }}
           disabled={uploadedDocuments.filter(doc => doc.document_id).length === 0}
+          className="vp-upload-submit"
+          style={{
+            background: 'linear-gradient(135deg, #23B44F 0%, #0D185B 100%)',
+            border: 'none',
+            transition: 'all 0.3s ease'
+          }}
         >
           {uploadedDocuments.filter(doc => doc.document_id).length === 0 
             ? 'Complete Contract Details & Upload Documents' 
@@ -1044,7 +1055,7 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
           <div>
             <Text strong>Contract Number:</Text> {contractData.contract_number}<br />
             <Text strong>Customer:</Text> {contractData.customer_name}<br />
-            <Text strong>Loan Amount:</Text> ${contractData.loan_amount?.toLocaleString()}<br />
+            <Text strong>Loan Amount:</Text> {contractData.loan_amount?.toLocaleString()} ₫<br />
             <Text strong>Status:</Text> <Tag color="#23B44F">{contractData.status}</Tag><br />
             <Text strong>Approval Stage:</Text> <Tag color="orange">{contractData.current_approval_stage}</Tag>
           </div>
@@ -1170,8 +1181,8 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
                                     style={{ width: '100%' }}
                                     defaultValue={parseFloat(displayValue) || 0}
                                     placeholder={`Enter ${key.replace(/_/g, ' ')}`}
-                                    formatter={value => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                                    parser={value => value.replace(/\$\s?|(,*)/g, '')}
+                                    formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + ' ₫'}
+                                    parser={value => value.replace(/\s?₫|(,*)/g, '')}
                                     onChange={(value) => {
                                       setEditableExtractedData(prev => ({
                                         ...prev,

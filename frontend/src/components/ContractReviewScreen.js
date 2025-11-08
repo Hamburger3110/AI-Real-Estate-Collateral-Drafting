@@ -54,7 +54,7 @@ function ContractReviewScreen() {
       id: 1,
       version: 'v1.3',
       date: '2024-10-25',
-      editor: 'Sarah Johnson',
+      editor: 'Nguyen Minh Anh',
       changes: 'Updated loan terms and interest rate',
       status: 'Current'
     },
@@ -62,7 +62,7 @@ function ContractReviewScreen() {
       id: 2,
       version: 'v1.2',
       date: '2024-10-22',
-      editor: 'Mike Wilson',
+      editor: 'Le Quoc Anh',
       changes: 'Corrected property address',
       status: 'Previous'
     },
@@ -70,7 +70,7 @@ function ContractReviewScreen() {
       id: 3,
       version: 'v1.1',
       date: '2024-10-20',
-      editor: 'Lisa Chen',
+      editor: 'Vu Thi Thanh Hien',
       changes: 'Initial draft creation',
       status: 'Previous'
     }
@@ -79,7 +79,7 @@ function ContractReviewScreen() {
   const extractedFields = [
     { field: 'Customer Name', value: 'John Smith', confidence: 98, verified: true },
     { field: 'Property Address', value: '123 Main St, City, State 12345', confidence: 95, verified: true },
-    { field: 'Loan Amount', value: '$250,000', confidence: 99, verified: true },
+    { field: 'Loan Amount', value: '250,000 ₫', confidence: 99, verified: true },
     { field: 'Interest Rate', value: '4.5%', confidence: 92, verified: false },
     { field: 'Property Type', value: 'Single Family Home', confidence: 88, verified: false }
   ];
@@ -247,7 +247,7 @@ function ContractReviewScreen() {
                 <Row gutter={16}>
                   <Col span={8}>
                     <Form.Item label="Loan Amount" name="loanAmount" rules={[{ required: true }]}>
-                      <Input prefix="$" />
+                      <Input suffix="₫" />
                     </Form.Item>
                   </Col>
                   <Col span={8}>
@@ -331,10 +331,10 @@ function ContractReviewScreen() {
 
                 <Paragraph>
                   <strong>LOAN DETAILS:</strong><br />
-                  Principal Amount: ${contractData.loanAmount?.toLocaleString()}<br />
+                  Principal Amount: {contractData.loanAmount?.toLocaleString()} ₫<br />
                   Interest Rate: {contractData.interestRate}% per annum<br />
                   Loan Term: {contractData.loanTerm} years<br />
-                  Monthly Payment: ${contractData.monthlyPayment?.toLocaleString()}
+                  Monthly Payment: {contractData.monthlyPayment?.toLocaleString()} ₫
                 </Paragraph>
 
                 <Paragraph>

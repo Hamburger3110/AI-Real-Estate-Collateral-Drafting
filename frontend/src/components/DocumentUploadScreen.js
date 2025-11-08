@@ -416,7 +416,8 @@ function DocumentUploadScreen() {
                     className="vp-upload-submit"
                     style={{
                       background: 'linear-gradient(135deg, #23B44F 0%, #0D185B 100%)',
-                      border: 'none'
+                      border: 'none',
+                      transition: 'all 0.3s ease'
                     }}
                   >
                     {loading ? 'Uploading to AWS S3...' : `Upload ${fileList.length} Document(s)`}
