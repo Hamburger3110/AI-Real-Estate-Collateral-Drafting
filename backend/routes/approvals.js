@@ -271,7 +271,7 @@ router.get('/pending', authenticateToken, async (req, res) => {
           WHERE stage = c.current_approval_stage AND approver_id = $2
         )
       GROUP BY c.contract_id, u_gen.full_name
-      ORDER BY c.generated_at ASC
+      ORDER BY c.generated_at DESC
     `, [userStages, req.user.user_id]);
 
     const contractsWithStageInfo = result.rows.map(contract => ({
