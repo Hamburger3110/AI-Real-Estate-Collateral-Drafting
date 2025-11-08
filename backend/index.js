@@ -6,7 +6,7 @@ const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() });
 const app = express();
 const PORT = process.env.PORT || 3001;
-const { createTables, runMigrations, seedDemoUsers, testConnection, createDocument, createActivityLog } = require('./db');
+const { pool, createTables, runMigrations, seedDemoUsers, testConnection, createDocument, createActivityLog } = require('./db');
 const { router: eventsRouter, sendTextractComplete } = require('./events');
 const { processDocument, getAPIForDocumentType } = require('./services/document-processor');
 
