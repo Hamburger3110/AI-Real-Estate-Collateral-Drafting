@@ -12,8 +12,10 @@ const BEDROCK_CONFIG = {
   // AWS Bedrock region
   region: process.env.AWS_REGION || 'us-east-1',
   
-  // Model configuration (to be updated after testing)
-  modelId: process.env.BEDROCK_MODEL_ID || 'anthropic.claude-3-sonnet-20240229-v1:0',
+  // Model configuration - use inference profile ID instead of model ID (required for on-demand models)
+  // Inference profile ID for Claude 3.5 Sonnet: us.anthropic.claude-3-5-sonnet-20240620-v1:0
+  // Inference profile ID for Claude 3 Sonnet: us.anthropic.claude-3-sonnet-20240229-v1:0 (if available)
+  modelId: process.env.BEDROCK_MODEL_ID || process.env.BEDROCK_INFERENCE_PROFILE_ID || 'us.anthropic.claude-3-5-sonnet-20240620-v1:0',
   
   // Document types supported by Bedrock
   supportedDocumentTypes: [
@@ -29,12 +31,28 @@ const BEDROCK_CONFIG = {
   timeout: 60000
 };
 
-// Initialize Bedrock Runtime client
-const bedrockRuntime = new AWS.BedrockRuntime({
-  region: BEDROCK_CONFIG.region,
-  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
-});
+// Initialize Bedrock Runtime client - support both profiles and environment variables
+let bedrockRuntime;
+if (process.env.AWS_PROFILE) {
+  // Use AWS profile from credentials file
+  const credentials = new AWS.SharedIniFileCredentials({ profile: process.env.AWS_PROFILE });
+  bedrockRuntime = new AWS.BedrockRuntime({
+    region: BEDROCK_CONFIG.region,
+    credentials: credentials
+  });
+} else if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
+  // Use environment variables (backward compatibility)
+  bedrockRuntime = new AWS.BedrockRuntime({
+    region: BEDROCK_CONFIG.region,
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+  });
+} else {
+  // Use default AWS credential chain
+  bedrockRuntime = new AWS.BedrockRuntime({
+    region: BEDROCK_CONFIG.region
+  });
+}
 
 /**
  * Submit document to AWS Bedrock for OCR extraction

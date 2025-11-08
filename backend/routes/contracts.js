@@ -486,12 +486,18 @@ router.get('/:contractId/document/:type', authenticateToken, async (req, res) =>
       return res.status(500).json({ error: 'Invalid document URL format' });
     }
     
-    // Stream file directly from S3
-    const s3 = new AWS.S3({
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-      region: process.env.AWS_REGION
-    });
+    // Stream file directly from S3 - support both profiles and environment variables
+    let s3Config = {
+      region: process.env.AWS_REGION || 'us-east-2'
+    };
+    if (process.env.AWS_PROFILE) {
+      const credentials = new AWS.SharedIniFileCredentials({ profile: process.env.AWS_PROFILE });
+      s3Config.credentials = credentials;
+    } else if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
+      s3Config.accessKeyId = process.env.AWS_ACCESS_KEY_ID;
+      s3Config.secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
+    }
+    const s3 = new AWS.S3(s3Config);
     
     const s3Params = {
       Bucket: 'document-upload-vp',

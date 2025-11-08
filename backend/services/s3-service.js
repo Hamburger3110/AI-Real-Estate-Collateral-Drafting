@@ -6,12 +6,23 @@
 const AWS = require('aws-sdk');
 const path = require('path');
 
-// Configure AWS S3
-const s3 = new AWS.S3({
-  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+// Configure AWS S3 - support both profiles and environment variables
+let s3Config = {
   region: process.env.AWS_REGION || 'us-east-1'
-});
+};
+
+if (process.env.AWS_PROFILE) {
+  // Use AWS profile from credentials file
+  const credentials = new AWS.SharedIniFileCredentials({ profile: process.env.AWS_PROFILE });
+  s3Config.credentials = credentials;
+} else if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
+  // Use environment variables (backward compatibility)
+  s3Config.accessKeyId = process.env.AWS_ACCESS_KEY_ID;
+  s3Config.secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
+}
+// Otherwise, use default AWS credential chain
+
+const s3 = new AWS.S3(s3Config);
 
 // Parse bucket name and default prefix from environment
 const S3_BUCKET_CONFIG = process.env.S3_BUCKET_NAME || 'ai-real-estate-contracts';
