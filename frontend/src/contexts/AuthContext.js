@@ -37,7 +37,6 @@ const PERMISSIONS = {
   // Review permissions
   CREDIT_REVIEW: 'CREDIT_REVIEW',
   LEGAL_REVIEW: 'LEGAL_REVIEW',
-  FINAL_APPROVAL: 'FINAL_APPROVAL',
   
   // System permissions
   MANAGE_USERS: 'MANAGE_USERS',
@@ -62,7 +61,6 @@ const ROLE_PERMISSIONS = {
     PERMISSIONS.DELETE_CONTRACTS,
     PERMISSIONS.CREDIT_REVIEW,
     PERMISSIONS.LEGAL_REVIEW,
-    PERMISSIONS.FINAL_APPROVAL,
     PERMISSIONS.MANAGE_USERS,
     PERMISSIONS.VIEW_ACTIVITY_LOGS,
     PERMISSIONS.SYSTEM_CONFIG,
@@ -90,7 +88,6 @@ const ROLE_PERMISSIONS = {
     PERMISSIONS.VIEW_CONTRACTS,
     PERMISSIONS.EDIT_CONTRACTS,
     PERMISSIONS.APPROVE_CONTRACTS,
-    PERMISSIONS.FINAL_APPROVAL,
     PERMISSIONS.VIEW_ACTIVITY_LOGS,
     PERMISSIONS.RECEIVE_NOTIFICATIONS,
     PERMISSIONS.SEND_NOTIFICATIONS
@@ -120,7 +117,7 @@ export const AuthProvider = ({ children }) => {
       console.log('🔐 Attempting login for:', email);
 
       // Make API call to backend for authentication
-      const response = await fetch('http://localhost:3001/auth/login', {
+      const response = await fetch(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:3001'}/api/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

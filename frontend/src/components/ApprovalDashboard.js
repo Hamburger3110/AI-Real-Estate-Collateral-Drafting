@@ -23,6 +23,7 @@ import {
 import { useAuth } from "../contexts/AuthContext";
 import { formatLocalDate } from "../utils/timeUtils";
 import { useNavigate } from "react-router-dom";
+import { buildApiUrl, API_ENDPOINTS } from '../config/api';
 
 const { Title, Text } = Typography;
 
@@ -38,7 +39,7 @@ function ApprovalDashboard() {
     if (!token) return;
 
     try {
-      const response = await fetch("http://localhost:3001/approvals/pending", {
+      const response = await fetch(buildApiUrl(API_ENDPOINTS.APPROVALS, '/pending'), {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -64,7 +65,7 @@ function ApprovalDashboard() {
     if (!token) return;
 
     try {
-      const response = await fetch("http://localhost:3001/approvals/stats", {
+      const response = await fetch(buildApiUrl(API_ENDPOINTS.APPROVALS, '/stats'), {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -102,7 +103,6 @@ function ApprovalDashboard() {
       credit_analysis: <CheckCircleOutlined />,
       legal_review: <ExclamationCircleOutlined />,
       risk_assessment: <ClockCircleOutlined />,
-      final_approval: <CheckCircleOutlined />,
     };
     return icons[stage] || <FileTextOutlined />;
   };

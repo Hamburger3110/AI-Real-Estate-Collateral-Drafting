@@ -26,13 +26,13 @@ import {
   FileTextOutlined,
   SafetyOutlined,
   BankOutlined,
-  CrownOutlined,
   LoadingOutlined,
 } from "@ant-design/icons";
 import { useAuth } from "../contexts/AuthContext";
 import { useParams, useNavigate } from "react-router-dom";
 import { formatLocalDate, formatLocalDateTime } from "../utils/timeUtils";
 import { calculateWorkflowProgress } from "../utils/progressUtils";
+import { buildApiUrl, API_ENDPOINTS } from '../config/api';
 
 const { Title, Text, Paragraph } = Typography;
 const { Step } = Steps;
@@ -45,8 +45,6 @@ function ApprovalWorkflowScreen() {
   const [actionLoading, setActionLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [currentAction, setCurrentAction] = useState(null);
-  const [contractDocuments, setContractDocuments] = useState(null);
-  const [documentsLoading, setDocumentsLoading] = useState(false);
   const [form] = Form.useForm();
 
   const { token } = useAuth();
@@ -59,7 +57,7 @@ function ApprovalWorkflowScreen() {
     setLoading(true);
     try {
       const response = await fetch(
-        `http://localhost:3001/approvals/contract/${contractId}`,
+        buildApiUrl(API_ENDPOINTS.APPROVALS, `/contract/${contractId}`),
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -87,34 +85,11 @@ function ApprovalWorkflowScreen() {
     }
   }, [contractId, token]);
 
-  const loadContractDocuments = useCallback(async () => {
-    if (!contractId) return;
-    
-    setDocumentsLoading(true);
-    try {
-      const response = await fetch(`/contracts/${contractId}/documents`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      if (response.ok) {
-        const documents = await response.json();
-        setContractDocuments(documents);
-      } else {
-        console.error('Failed to load contract documents');
-      }
-    } catch (error) {
-      console.error('Error loading contract documents:', error);
-    } finally {
-      setDocumentsLoading(false);
-    }
-  }, [contractId, token]);
+
 
   useEffect(() => {
     fetchWorkflow();
-    loadContractDocuments();
-  }, [fetchWorkflow, loadContractDocuments]);
+  }, [fetchWorkflow]);
 
   const handleAction = async (action, stage) => {
     setCurrentAction({ action, stage });
@@ -127,7 +102,7 @@ function ApprovalWorkflowScreen() {
     setActionLoading(true);
     try {
       const response = await fetch(
-        `http://localhost:3001/approvals/contract/${contractId}/stage/${currentAction.stage}`,
+        buildApiUrl(API_ENDPOINTS.APPROVALS, `/contract/${contractId}/stage/${currentAction.stage}`),
         {
           method: "POST",
           headers: {
@@ -169,7 +144,6 @@ function ApprovalWorkflowScreen() {
       credit_analysis: <BankOutlined />,
       legal_review: <SafetyOutlined />,
       risk_assessment: <ClockCircleOutlined />,
-      final_approval: <CrownOutlined />,
     };
     return icons[stage] || <FileTextOutlined />;
   };
@@ -301,73 +275,43 @@ function ApprovalWorkflowScreen() {
             </Card>
 
             {/* Contract Documents */}
-            {(contractDocuments || (contract.pdf_url || contract.docx_url)) && (
-              <Card title="Generated Contract" style={{ marginBottom: "24px" }} loading={documentsLoading}>
+            {contract && (
+              <Card title="Generated Contract" style={{ marginBottom: "24px" }}>
                 <Space direction="vertical" style={{ width: "100%" }}>
-                  {contractDocuments ? (
-                    <>
-                      {contractDocuments.pdf_url && (
-                        <div>
-                          <Text strong>PDF Contract:</Text>
-                          <br />
-                          <Button
-                            type="primary"
-                            icon={<FileTextOutlined />}
-                            onClick={() => window.open(contractDocuments.pdf_url, '_blank')}
-                            style={{ marginTop: "8px" }}
-                          >
-                            View PDF Contract
-                          </Button>
-                        </div>
-                      )}
-                      {contractDocuments.docx_url && (
-                        <div>
-                          <Text strong>Word Document:</Text>
-                          <br />
-                          <Button
-                            icon={<FileTextOutlined />}
-                            onClick={() => window.open(contractDocuments.docx_url, '_blank')}
-                            style={{ marginTop: "8px" }}
-                          >
-                            Download DOCX
-                          </Button>
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      {contract.pdf_url && (
-                        <div>
-                          <Text strong>PDF Contract:</Text>
-                          <br />
-                          <Button
-                            type="primary"
-                            icon={<FileTextOutlined />}
-                            onClick={() => window.open(contract.pdf_url, '_blank')}
-                            style={{ marginTop: "8px" }}
-                          >
-                            View PDF Contract
-                          </Button>
-                        </div>
-                      )}
-                      {contract.docx_url && (
-                        <div>
-                          <Text strong>Word Document:</Text>
-                          <br />
-                          <Button
-                            icon={<FileTextOutlined />}
-                            onClick={() => window.open(contract.docx_url, '_blank')}
-                            style={{ marginTop: "8px" }}
-                          >
-                            Download DOCX
-                          </Button>
-                        </div>
-                      )}
-                    </>
+                  {contract.pdf_url && (
+                    <div>
+                      <Text strong>PDF Contract:</Text>
+                      <br />
+                      <Button
+                        type="primary"
+                        icon={<FileTextOutlined />}
+                        onClick={() => window.open(contract.pdf_url, '_blank')}
+                        style={{ marginTop: "8px" }}
+                      >
+                        View PDF Contract
+                      </Button>
+                    </div>
                   )}
-                  <Text type="secondary" style={{ fontSize: "12px" }}>
-                    Generated on {formatLocalDate(contract.generated_at)}
-                  </Text>
+                  {contract.docx_url && (
+                    <div>
+                      <Text strong>Word Document:</Text>
+                      <br />
+                      <Button
+                        icon={<FileTextOutlined />}
+                        onClick={() => window.open(contract.docx_url, '_blank')}
+                        style={{ marginTop: "8px" }}
+                      >
+                        Download DOCX
+                      </Button>
+                    </div>
+                  )}
+                  {!contract.pdf_url && !contract.docx_url && (
+                    <div style={{ padding: "16px", backgroundColor: "#fffbf0", border: "1px solid #faad14", borderRadius: "6px" }}>
+                      <Text type="warning">
+                        ⚠️ No contract document URLs found in database. Generate a new contract document below.
+                      </Text>
+                    </div>
+                  )}
                 </Space>
               </Card>
             )}
@@ -407,65 +351,33 @@ function ApprovalWorkflowScreen() {
           {/* Workflow Steps */}
           <Col xs={24} lg={16}>
             {/* Contract Preview Section */}
-            {(contractDocuments || (contract.pdf_url || contract.docx_url)) && (
-              <Card title="Contract Review" style={{ marginBottom: "24px" }} loading={documentsLoading}>
+            {(contract.pdf_url || contract.docx_url) && (
+              <Card title="Contract Review" style={{ marginBottom: "24px" }}>
                 <Row gutter={16}>
-                  {contractDocuments ? (
-                    <>
-                      {contractDocuments.pdf_url && (
-                        <Col xs={24} sm={12}>
-                          <Button
-                            type="primary"
-                            size="large"
-                            icon={<FileTextOutlined />}
-                            block
-                            onClick={() => window.open(contractDocuments.pdf_url, '_blank')}
-                          >
-                            📄 Review PDF Contract
-                          </Button>
-                        </Col>
-                      )}
-                      {contractDocuments.docx_url && (
-                        <Col xs={24} sm={12}>
-                          <Button
-                            size="large"
-                            icon={<FileTextOutlined />}
-                            block
-                            onClick={() => window.open(contractDocuments.docx_url, '_blank')}
-                          >
-                            📝 Download Word Document
-                          </Button>
-                        </Col>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      {contract.pdf_url && (
-                        <Col xs={24} sm={12}>
-                          <Button
-                            type="primary"
-                            size="large"
-                            icon={<FileTextOutlined />}
-                            block
-                            onClick={() => window.open(contract.pdf_url, '_blank')}
-                          >
-                            📄 Review PDF Contract
-                          </Button>
-                        </Col>
-                      )}
-                      {contract.docx_url && (
-                        <Col xs={24} sm={12}>
-                          <Button
-                            size="large"
-                            icon={<FileTextOutlined />}
-                            block
-                            onClick={() => window.open(contract.docx_url, '_blank')}
-                          >
-                            📝 Download Word Document
-                          </Button>
-                        </Col>
-                      )}
-                    </>
+                  {contract.pdf_url && (
+                    <Col xs={24} sm={12}>
+                      <Button
+                        type="primary"
+                        size="large"
+                        icon={<FileTextOutlined />}
+                        block
+                        onClick={() => window.open(contract.pdf_url, '_blank')}
+                      >
+                        📄 Review PDF Contract
+                      </Button>
+                    </Col>
+                  )}
+                  {contract.docx_url && (
+                    <Col xs={24} sm={12}>
+                      <Button
+                        size="large"
+                        icon={<FileTextOutlined />}
+                        block
+                        onClick={() => window.open(contract.docx_url, '_blank')}
+                      >
+                        📝 Download Word Document
+                      </Button>
+                    </Col>
                   )}
                 </Row>
                 <Alert

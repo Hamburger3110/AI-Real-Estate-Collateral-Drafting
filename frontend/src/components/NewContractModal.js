@@ -28,6 +28,7 @@ import {
   ReloadOutlined
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
+import { buildApiUrl, API_ENDPOINTS } from '../config/api';
 
 const { Dragger } = Upload;
 const { Text } = Typography;
@@ -138,9 +139,27 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, '0');
     const day = String(now.getDate()).padStart(2, '0');
-    const time = String(now.getHours()).padStart(2, '0') + String(now.getMinutes()).padStart(2, '0');
-    return `CT-${year}${month}${day}-${time}`;
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    const milliseconds = String(now.getMilliseconds()).padStart(3, '0');
+    return `CT-${year}${month}${day}-${hours}${minutes}${seconds}${milliseconds}`;
   };
+
+  // Reset state when modal opens to prevent conflicts
+  React.useEffect(() => {
+    if (visible && !contractData) {
+      // Reset all state to ensure clean start
+      setCurrentStep(0);
+      setFileList([]);
+      setUploadedDocuments([]);
+      setUploadProgress({});
+      setEditableExtractedData({});
+      setEditingDocument(null);
+      contractForm.resetFields();
+      documentForm.resetFields();
+    }
+  }, [visible, contractData, contractForm, documentForm]);
 
   // Auto-create draft contract when modal opens
   React.useEffect(() => {
@@ -153,7 +172,7 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
           const contractNumber = generateContractNumber();
           console.log('Auto-creating draft contract:', contractNumber);
           
-          const response = await fetch('http://localhost:3001/contracts', {
+          const response = await fetch(buildApiUrl(API_ENDPOINTS.CONTRACTS), {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -161,8 +180,7 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
             },
             body: JSON.stringify({
               contract_number: contractNumber,
-              customer_name: 'Draft Contract',
-              property_address: 'To be updated',
+              customer_name: 'CUSTOMER',
               loan_amount: 0,
               generated_by: user.user_id
             })
@@ -193,6 +211,16 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
 
     autoCreateDraftContract();
   }, [visible, contractData, autoCreating, token, user, onCancel]);
+
+  // Update form when contract data changes
+  React.useEffect(() => {
+    if (contractData && contractForm) {
+      contractForm.setFieldsValue({
+        customer_name: contractData.customer_name || '',
+        loan_amount: contractData.loan_amount || undefined
+      });
+    }
+  }, [contractData, contractForm]);
 
   const steps = [
     {
@@ -285,7 +313,7 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
             const result = response.data;
             
             // Link document to contract
-            const linkResponse = await fetch(`http://localhost:3001/documents/${result.document_id}`, {
+            const linkResponse = await fetch(buildApiUrl(API_ENDPOINTS.DOCUMENTS, `/${result.document_id}`), {
               method: 'PUT',
               headers: {
                 'Content-Type': 'application/json',
@@ -302,7 +330,7 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
             }
 
             // Fetch the updated document data with ocr_extracted_json
-            const updatedDocResponse = await fetch(`http://localhost:3001/documents/${result.document_id}`, {
+            const updatedDocResponse = await fetch(buildApiUrl(API_ENDPOINTS.DOCUMENTS, `/${result.document_id}`), {
               method: 'GET',
               headers: {
                 'Authorization': `Bearer ${token}`
@@ -413,7 +441,7 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
         reject(new Error('Upload timeout'));
       };
 
-      xhr.open('POST', 'http://localhost:3001/upload');
+      xhr.open('POST', buildApiUrl(API_ENDPOINTS.UPLOAD));
       xhr.setRequestHeader('Authorization', `Bearer ${token}`);
       
       console.log('Starting upload for:', fileItem.file.name, 'Type:', fileItem.type);
@@ -469,7 +497,7 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
       const refreshPromises = uploadedDocuments.map(async (doc) => {
         if (!doc.document_id) return doc;
 
-        const response = await fetch(`http://localhost:3001/documents/${doc.document_id}`, {
+        const response = await fetch(buildApiUrl(API_ENDPOINTS.DOCUMENTS, `/${doc.document_id}`), {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`
@@ -532,7 +560,7 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
           const [documentId, fieldName] = fieldKey.split('_');
           
           try {
-            const saveResponse = await fetch(`http://localhost:3001/documents/${documentId}/validate`, {
+            const saveResponse = await fetch(buildApiUrl(API_ENDPOINTS.DOCUMENTS, `/${documentId}/validate`), {
               method: 'POST',
               headers: {
                 'Authorization': `Bearer ${token}`,
@@ -563,7 +591,7 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
       }
       
       // Call backend validation endpoint
-      const response = await fetch(`http://localhost:3001/contracts/${contractData.contract_id}/validate`, {
+      const response = await fetch(buildApiUrl(API_ENDPOINTS.CONTRACTS, `/${contractData.contract_id}/validate`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -577,18 +605,169 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
       }
 
       const result = await response.json();
-      message.success(`Contract created successfully! ${result.document_count} document(s) verified and attached. Approval workflow has been started.`);
+      message.success({
+        content: (
+          <div>
+            <div style={{ fontWeight: 'bold' }}>✅ Contract Validated Successfully!</div>
+            <div style={{ fontSize: '12px', marginTop: '4px' }}>
+              {result.document_count} document(s) verified and attached
+            </div>
+          </div>
+        ),
+        duration: 3
+      });
+      
+      // STEP 2: Automatically generate the contract document
+      message.info('🏗️ Generating contract document...');
+      
+      try {
+        const generateResponse = await fetch(buildApiUrl(API_ENDPOINTS.CONTRACTS, `/${contractData.contract_id}/generate`), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            // Include any user input fields from the contract form
+            userInputFields: {
+              'doc.number': contractData.contract_number,
+              'doc.signing_date': new Date().toLocaleDateString('vi-VN'),
+              'loan.amount': contractData.loan_amount?.toString()
+            }
+          })
+        });
+
+        if (generateResponse.ok) {
+          // Check if response is a file download
+          const contentType = generateResponse.headers.get('content-type');
+          if (contentType && contentType.includes('application/vnd.openxmlformats-officedocument.wordprocessingml.document')) {
+            // It's a file download - create download link
+            const blob = await generateResponse.blob();
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `contract_${contractData.contract_number}_${Date.now()}.docx`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+            
+            message.success({
+              content: (
+                <div>
+                  <div style={{ fontWeight: 'bold' }}>📄 Contract Document Generated!</div>
+                  <div style={{ fontSize: '12px', marginTop: '4px' }}>
+                    Comprehensive contract document downloaded successfully
+                  </div>
+                </div>
+              ),
+              duration: 4
+            });
+          } else {
+            // It's a JSON response
+            const generateResult = await generateResponse.json();
+            if (generateResult.success) {
+              message.success({
+                content: '🎉 Contract document generated successfully!',
+                duration: 6
+              });
+            } else {
+              throw new Error(generateResult.error || 'Contract generation failed');
+            }
+          }
+        } else {
+          const generateError = await generateResponse.json();
+          throw new Error(generateError.error || 'Contract generation failed');
+        }
+        
+      } catch (generateError) {
+        console.error('Contract generation error:', generateError);
+        message.warning({
+          content: (
+            <div>
+              <div style={{ fontWeight: 'bold' }}>⚠️ Contract Created - Generation Issue</div>
+              <div style={{ fontSize: '12px', marginTop: '4px' }}>
+                Contract created successfully but document generation failed: {generateError.message}
+                <br />
+                You can generate the document later from the contract details page.
+              </div>
+            </div>
+          ),
+          duration: 10,
+          style: {
+            marginTop: '100px'
+          }
+        });
+      }
+      
+      // STEP 3: Show completion snackbar and reset form
+      message.success({
+        content: (
+          <div>
+            <div style={{ fontWeight: 'bold', fontSize: '16px', marginBottom: '8px' }}>
+              🎉 Contract Creation Completed Successfully!
+            </div>
+            <div style={{ fontSize: '14px' }}>
+              Contract {contractData.contract_number} has been created with {result.document_count} document(s) attached.
+              <br />
+              ✅ Contract document generated and downloaded
+              <br />
+              🔄 Approval workflow has been started
+            </div>
+          </div>
+        ),
+        duration: 8,
+        style: {
+          marginTop: '100px'
+        }
+      });
+      
+      // Reset form state without deleting the contract (successful completion)
+      setCurrentStep(0);
+      setContractData(null);
+      setFileList([]);
+      setUploadedDocuments([]);
+      setUploadProgress({});
+      setAutoCreating(false);
+      setEditableExtractedData({});
+      setEditingDocument(null);
+      contractForm.resetFields();
+      documentForm.resetFields();
+      
       onSuccess();
-      handleCancel();
     } catch (error) {
-      console.error('Contract validation error:', error);
+      console.error('Contract completion error:', error);
       message.error(`Failed to complete contract: ${error.message}`);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCancel = () => {
+  const handleCancel = async () => {
+    // Clean up draft contract if it exists and hasn't been completed
+    if (contractData && contractData.contract_id) {
+      try {
+        console.log('Cleaning up draft contract:', contractData.contract_id);
+        const response = await fetch(buildApiUrl(API_ENDPOINTS.CONTRACTS, `/${contractData.contract_id}`), {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (response.ok) {
+          console.log('✅ Draft contract cleaned up successfully');
+        } else {
+          const errorData = await response.json();
+          console.warn('Draft contract cleanup failed:', errorData.error);
+        }
+      } catch (error) {
+        console.warn('Failed to clean up draft contract:', error);
+        // Don't show error to user as this is cleanup
+      }
+    }
+
     setCurrentStep(0);
     setContractData(null);
     setFileList([]);
@@ -604,8 +783,79 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
 
 
 
+  // Handle contract details update
+  const handleContractDetailsUpdate = async (values) => {
+    if (!contractData || !contractData.contract_id) return;
+    
+    try {
+      const response = await fetch(buildApiUrl(API_ENDPOINTS.CONTRACTS, `/${contractData.contract_id}`), {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(values)
+      });
+
+      if (response.ok) {
+        const updatedContract = await response.json();
+        setContractData(updatedContract);
+        message.success('Contract details updated');
+      }
+    } catch (error) {
+      console.error('Failed to update contract details:', error);
+    }
+  };
+
   const renderDocumentUpload = () => (
     <div>
+      <Card title="Contract Details" style={{ marginBottom: 16 }}>
+        <Form
+          form={contractForm}
+          layout="vertical"
+          initialValues={{
+            customer_name: contractData?.customer_name || '',
+            loan_amount: contractData?.loan_amount || undefined
+          }}
+
+        >
+          <Form.Item
+            name="customer_name"
+            label="Customer Name"
+            rules={[
+              { required: true, message: 'Please enter customer name' },
+              { min: 2, message: 'Customer name must be at least 2 characters' }
+            ]}
+          >
+            <Input placeholder="Enter customer full name" />
+          </Form.Item>
+
+          <Form.Item
+            name="loan_amount"
+            label="Loan Amount"
+            rules={[
+              { required: true, message: 'Please enter loan amount' },
+              { 
+                validator: (_, value) => {
+                  if (!value || value <= 0) {
+                    return Promise.reject(new Error('Loan amount must be greater than 0'));
+                  }
+                  return Promise.resolve();
+                }
+              }
+            ]}
+          >
+            <InputNumber
+              placeholder="Enter loan amount"
+              style={{ width: '100%' }}
+              formatter={value => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+              parser={value => value.replace(/\$\s?|(,*)/g, '')}
+              min={0}
+            />
+          </Form.Item>
+        </Form>
+      </Card>
+
       <Card title="Upload Supporting Documents" style={{ marginBottom: 16 }}>
         <Dragger {...uploadProps} className="vp-upload-area">
           <p className="ant-upload-drag-icon">
@@ -691,13 +941,36 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
         <Button 
           type="primary" 
           onClick={async () => {
-            await refreshDocumentData();
-            setCurrentStep(1);
+            try {
+              // First check if documents are uploaded
+              const uploadedDocs = uploadedDocuments.filter(doc => doc.document_id);
+              if (uploadedDocs.length === 0) {
+                message.warning('Please upload at least one document');
+                return;
+              }
+
+              // Then validate contract form
+              const formValues = await contractForm.validateFields();
+              
+              // Save the validated form data
+              await handleContractDetailsUpdate(formValues);
+              
+              // Refresh document data and proceed
+              await refreshDocumentData();
+              setCurrentStep(1);
+            } catch (error) {
+              if (error.errorFields && error.errorFields.length > 0) {
+                message.error('Please fill in all required contract details');
+              } else {
+                console.error('Error proceeding to review:', error);
+                message.error('Failed to proceed to review');
+              }
+            }
           }}
           disabled={uploadedDocuments.filter(doc => doc.document_id).length === 0}
         >
           {uploadedDocuments.filter(doc => doc.document_id).length === 0 
-            ? 'Upload Documents to Continue' 
+            ? 'Complete Contract Details & Upload Documents' 
             : 'Continue to Review'
           }
         </Button>
@@ -712,7 +985,6 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
           <div>
             <Text strong>Contract Number:</Text> {contractData.contract_number}<br />
             <Text strong>Customer:</Text> {contractData.customer_name}<br />
-            <Text strong>Property:</Text> {contractData.property_address}<br />
             <Text strong>Loan Amount:</Text> ${contractData.loan_amount?.toLocaleString()}<br />
             <Text strong>Status:</Text> <Tag color="#23B44F">{contractData.status}</Tag><br />
             <Text strong>Approval Stage:</Text> <Tag color="orange">{contractData.current_approval_stage}</Tag>
@@ -958,10 +1230,13 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
           type="primary" 
           onClick={handleFinish}
           disabled={uploadedDocuments.filter(doc => doc.document_id).length === 0}
+          loading={loading}
         >
-          {uploadedDocuments.filter(doc => doc.document_id).length === 0 
-            ? 'Upload Documents Required' 
-            : 'Complete Contract Creation'
+          {loading 
+            ? 'Creating & Generating Contract...' 
+            : uploadedDocuments.filter(doc => doc.document_id).length === 0 
+              ? 'Upload Documents Required' 
+              : 'Complete Contract Creation & Generate Document'
           }
         </Button>
       </Space>
@@ -996,6 +1271,16 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
           <div style={{ textAlign: 'center', padding: '50px' }}>
             <Spin size="large" />
             <p style={{ marginTop: 16 }}>Creating contract...</p>
+          </div>
+        ) : loading && contractData ? (
+          <div style={{ textAlign: 'center', padding: '50px' }}>
+            <Spin size="large" />
+            <p style={{ marginTop: 16, fontSize: '16px', fontWeight: 'bold' }}>
+              🏗️ Completing Contract Creation
+            </p>
+            <p style={{ marginTop: 8, color: '#666' }}>
+              Validating documents, generating contract document, and starting approval workflow...
+            </p>
           </div>
         ) : (
           <>

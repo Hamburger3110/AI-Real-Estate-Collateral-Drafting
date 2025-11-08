@@ -25,6 +25,7 @@
     "jsonwebtoken": "^9.0.2",
     "mammoth": "^1.11.0",
     "multer": "^2.0.2",
+    "node-fetch": "^3.3.2",
     "officegen": "^0.6.5",
     "pdf-lib": "^1.17.1",
     "pg": "^8.16.3",

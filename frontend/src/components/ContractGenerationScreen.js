@@ -30,6 +30,7 @@ import {
 } from "@ant-design/icons";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { buildApiUrl, API_ENDPOINTS } from '../config/api';
 
 const { Title, Text } = Typography;
 const { confirm } = Modal;
@@ -57,7 +58,7 @@ function ContractGenerationScreen() {
     try {
       setLoading(true);
       const response = await fetch(
-        `http://localhost:3001/contracts/${contractId}`,
+        buildApiUrl(API_ENDPOINTS.CONTRACTS, `/${contractId}`),
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -84,7 +85,7 @@ function ContractGenerationScreen() {
     try {
       setLoading(true);
       const response = await fetch(
-        `http://localhost:3001/contracts/${contractId}/generation-preview`,
+        buildApiUrl(API_ENDPOINTS.GENERATION_PREVIEW, `/${contractId}`),
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -111,7 +112,7 @@ function ContractGenerationScreen() {
     try {
       setGenerating(true);
       const response = await fetch(
-        `http://localhost:3001/contracts/${contractId}/generate`,
+        buildApiUrl(API_ENDPOINTS.GENERATE_CONTRACT, `/${contractId}`),
         {
           method: "POST",
           headers: {

@@ -13,11 +13,22 @@ const s3Service = require('./s3-service');
 
 class ContractGenerator {
   constructor() {
-    // Use comprehensive template if it exists, otherwise fall back to simple template
-    const comprehensiveTemplate = path.join(__dirname, '../../frontend/public/contract_template_comprehensive.docx');
-    const simpleTemplate = path.join(__dirname, '../../frontend/public/contract_template.docx');
+    // Use the original comprehensive template with updated placeholder format
+    const templatePaths = [
+      path.join(__dirname, '../../frontend/public/contract_template_original.docx'),
+      path.join(__dirname, '../../frontend/public/contract_template.docx'),
+      path.join(__dirname, '../../frontend/public/contract_template_simple_backup.docx')
+    ];
     
-    this.templatePath = fs.existsSync(comprehensiveTemplate) ? comprehensiveTemplate : simpleTemplate;
+    // Find the first existing template
+    this.templatePath = templatePaths.find(templatePath => fs.existsSync(templatePath));
+    
+    if (!this.templatePath) {
+      console.error('❌ No DOCX template found in any of these locations:', templatePaths);
+      throw new Error('No contract template found');
+    }
+    
+    console.log(`📋 Using working contract template: ${this.templatePath}`);
   }
 
   /**
@@ -153,56 +164,110 @@ class ContractGenerator {
   }
 
   /**
-   * Format mapped fields for DOCX template placeholders
-   * @param {Object} mappedFields - Mapped fields from extraction
+   * Format mapped fields for DOCX template placeholders (Original Template Format)
+   * @param {Object} mappedFields - Mapped fields from OCR extraction
    * @returns {Object} Template-ready field data
    */
   formatFieldsForTemplate(mappedFields) {
     const templateData = {};
     
-    // Direct field mapping - convert dots to underscores for template placeholders
-    Object.entries(mappedFields).forEach(([key, value]) => {
-      const templateKey = key.replace(/\./g, '_');
-      templateData[templateKey] = value || '';
-    });
+    // Map to original template's specific field names
     
-    // Add formatted date fields
-    if (mappedFields['doc.signing_date']) {
-      const date = new Date(mappedFields['doc.signing_date']);
-      templateData['signing_date_formatted'] = date.toLocaleDateString('vi-VN');
-      templateData['signing_day'] = date.getDate().toString().padStart(2, '0');
-      templateData['signing_month'] = (date.getMonth() + 1).toString().padStart(2, '0');
-      templateData['signing_year'] = date.getFullYear().toString();
-    }
+    // Document information
+    templateData['doc.number'] = mappedFields['doc.number'] || '';
+    templateData['doc.signing_date'] = mappedFields['doc.signing_date'] || new Date().toLocaleDateString('vi-VN');
+    templateData['doc.signing_location.office'] = mappedFields['doc.signing_location.office'] || '';
     
-    // Add current date for generation
-    const now = new Date();
-    templateData['generation_date'] = now.toLocaleDateString('vi-VN');
-    templateData['generation_day'] = now.getDate().toString().padStart(2, '0');
-    templateData['generation_month'] = (now.getMonth() + 1).toString().padStart(2, '0');
-    templateData['generation_year'] = now.getFullYear().toString();
+    // Bank/Mortgagee information (Vietnamese bank)
+    templateData['mortgagee.legal_name'] = mappedFields['branch.name'] || 'NGÂN HÀNG THƯƠNG MẠI CỔ PHẦN VIỆT NAM THỊNH VƯỢNG';
+    templateData['mortgagee.address'] = mappedFields['branch.address'] || '';
+    templateData['mortgagee.biz_reg_code'] = mappedFields['branch.bizregcode'] || '';
+    templateData['mortgagee.biz_reg_authority'] = mappedFields['branch.bizregissue'] || '';
+    templateData['mortgagee.biz_reg_first_issue_date'] = mappedFields['branch.bizreg.first.issued.date'] || '';
+    templateData['mortgagee.biz_phone_number'] = mappedFields['branch.phone.number'] || '';
+    templateData['mortgagee.biz_fax_code'] = mappedFields['branch.fax'] || '';
+    templateData['mortgagee.representative.name'] = mappedFields['branch.representative.name'] || '';
+    templateData['mortgagee.representative.title'] = mappedFields['branch.representative.title'] || '';
     
-    // Format currency fields
+    // Customer/Mortgagor information  
+    templateData['mortgagor.name'] = mappedFields['lender.name'] || '';
+    templateData['mortgagor.id.number'] = mappedFields['lender.id.number'] || '';
+    templateData['mortgagor.id.issuer'] = mappedFields['lender.id.issuer'] || '';
+    templateData['mortgagor.id.issue_date'] = mappedFields['lender.id.issue_date'] || '';
+    templateData['mortgagor.address.original'] = mappedFields['lender.address.original'] || '';
+    
+    // Spouse information (if available)
+    templateData['spouse.name'] = mappedFields['spouse.name'] || '';
+    templateData['spouse.id.number'] = mappedFields['spouse.id.number'] || '';
+    templateData['spouse.id.issuer'] = mappedFields['spouse.id.issuer'] || '';
+    templateData['spouse.id.issue_date'] = mappedFields['spouse.id.issue_date'] || '';
+    templateData['spouse.address.original'] = mappedFields['spouse.address.original'] || '';
+    
+    // Property information - Vietnamese field names
+    templateData['SO_GCN'] = mappedFields['prop.certID'] || '';  // Certificate Number
+    templateData['NOI_CAP_GCN'] = mappedFields['prop.cert.issuer'] || '';  // Certificate Issuer
+    templateData['NGAY_CAP_GCN'] = mappedFields['prop.cert.issue.date'] || '';  // Certificate Issue Date
+    templateData['TEN_CHU_GCN'] = mappedFields['prop.cert.owner'] || '';  // Certificate Owner
+    templateData['SO_THUA'] = mappedFields['prop.detailed.id'] || '';  // Land Parcel Number
+    templateData['SO_TO_BAN_DO'] = mappedFields['prop.mapID'] || '';  // Map Sheet Number
+    templateData['DIA_CHI_TAI_SAN'] = mappedFields['prop.address'] || '';  // Property Address
+    templateData['DIA_CHI_THUA_DAT'] = mappedFields['prop.address'] || '';  // Land Address (same as property)
+    templateData['DIEN_TICH_DAT'] = mappedFields['prop.area'] || '';  // Land Area
+    templateData['DIEN_TICH_DAT_Text'] = mappedFields['prop.area'] ? mappedFields['prop.area'] + ' m²' : '';  // Land Area with unit
+    templateData['HINH_THUC_SD'] = mappedFields['prop.usage.method'] || '';  // Usage Method
+    templateData['MUC_DICH_SD'] = mappedFields['prop.purpose'] || '';  // Usage Purpose
+    templateData['THOI_HAN_SD'] = mappedFields['prop.period'] || '';  // Usage Period
+    templateData['NGUON_GOC_SD'] = mappedFields['prop.origin'] || '';  // Land Origin
+    templateData['GIA_TRI_TAI_SAN'] = mappedFields['prop.value'] || '';  // Property Value
+    
+    // Asset construction information
+    templateData['DIA_CHI_TRU_SO'] = mappedFields['aprop.address'] || '';  // Construction Address
+    templateData['DIEN_TICH_XAY_DUNG'] = mappedFields['aprop.construct.area'] || '';  // Construction Area
+    templateData['DIEN_TICH_SAN'] = mappedFields['aprop.floor.area'] || '';  // Floor Area
+    templateData['KET_CAU'] = mappedFields['aprop.construction.method'] || '';  // Construction Method
+    templateData['CAP_HANG'] = mappedFields['aprop.level'] || '';  // Building Level
+    templateData['SO_TANG'] = mappedFields['aprop.floor'] || '';  // Floor Number
+    templateData['NAM_HOAN_THANH'] = mappedFields['aprop.yearbuilt'] || '';  // Year Built
+    templateData['THOI_HAN_SO_HUU'] = mappedFields['aprop.possessdue'] || '';  // Possession Due
+    templateData['GHI_CHU'] = mappedFields['aprop.note'] || '';  // Additional Notes
+    
+    // Company information (if business loan)
+    templateData['TEN_BEN_DUOC_BAO_DAM'] = mappedFields['lender.companyname'] || '';  // Company Name
+    templateData['MA_SO_DN'] = mappedFields['lender.company.bizregcode'] || '';  // Business Registration Code
+    templateData['DIA_CHI_TRU_SO'] = mappedFields['lender.company.address'] || templateData['DIA_CHI_TRU_SO'];  // Company Address
+    
+    // Format loan amount
     if (mappedFields['loan.amount']) {
       const amount = parseFloat(mappedFields['loan.amount']);
       if (!isNaN(amount)) {
+        templateData['GIA_TRI_BANG_CHU'] = this.numberToWords(amount) + ' đồng';  // Amount in words
         templateData['loan_amount_formatted'] = amount.toLocaleString('vi-VN') + ' VND';
-        templateData['loan_amount_words'] = this.numberToWords(amount) + ' đồng';
       }
     }
     
+    // Format property value in words
     if (mappedFields['prop.value']) {
       const value = parseFloat(mappedFields['prop.value']);
       if (!isNaN(value)) {
-        templateData['prop_value_formatted'] = value.toLocaleString('vi-VN') + ' VND';
-        templateData['prop_value_words'] = this.numberToWords(value) + ' đồng';
+        if (!templateData['GIA_TRI_BANG_CHU']) {  // Only if not set by loan amount
+          templateData['GIA_TRI_BANG_CHU'] = this.numberToWords(value) + ' đồng';
+        }
       }
     }
     
-    // Format area with units
-    if (mappedFields['prop.area']) {
-      templateData['prop_area_formatted'] = mappedFields['prop.area'] + ' m²';
+    // Add default values for common fields that might be empty
+    const currentDate = new Date();
+    if (!templateData['doc.signing_date']) {
+      templateData['doc.signing_date'] = currentDate.toLocaleDateString('vi-VN');
     }
+    
+    // Time-related fields for agreements
+    templateData['THOI_HAN_TU_BAN'] = '';  // Duration from... (to be filled)
+    templateData['THOI_HAN_THOA_THUAN_GIA'] = '';  // Agreed price period
+    templateData['THOI_HAN_THOA_THUAN_GIA_TEXT'] = '';  // Agreed price period text
+    templateData['SO_VAO_SO'] = '';  // Entry number
+    
+    console.log('📋 Template data prepared for original template with keys:', Object.keys(templateData).filter(key => templateData[key] !== ''));
     
     return templateData;
   }

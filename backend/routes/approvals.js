@@ -4,6 +4,8 @@ const { authenticateToken } = require('../middleware/auth');
 const { pool } = require('../db');
 const { quickLog } = require('../middleware/activityLogger');
 
+
+
 // Approval workflow stages and their order
 const APPROVAL_STAGES = {
   DOCUMENT_REVIEW: 'document_review',
@@ -18,9 +20,7 @@ const STAGE_ORDER = [
   APPROVAL_STAGES.DOCUMENT_REVIEW,
   APPROVAL_STAGES.CREDIT_ANALYSIS,
   APPROVAL_STAGES.LEGAL_REVIEW,
-  APPROVAL_STAGES.RISK_ASSESSMENT,
-  APPROVAL_STAGES.FINAL_APPROVAL,
-  APPROVAL_STAGES.COMPLETED
+  APPROVAL_STAGES.RISK_ASSESSMENT
 ];
 
 // Role permissions for each stage
@@ -28,8 +28,7 @@ const STAGE_PERMISSIONS = {
   [APPROVAL_STAGES.DOCUMENT_REVIEW]: ['ADMIN', 'CREDIT_OFFICER'],
   [APPROVAL_STAGES.CREDIT_ANALYSIS]: ['ADMIN', 'CREDIT_OFFICER'],
   [APPROVAL_STAGES.LEGAL_REVIEW]: ['ADMIN', 'LEGAL_OFFICER'],
-  [APPROVAL_STAGES.RISK_ASSESSMENT]: ['ADMIN', 'MANAGER'],
-  [APPROVAL_STAGES.FINAL_APPROVAL]: ['ADMIN', 'MANAGER']
+  [APPROVAL_STAGES.RISK_ASSESSMENT]: ['ADMIN', 'MANAGER']
 };
 
 // Get approval workflow for a contract
@@ -86,11 +85,51 @@ router.get('/contract/:contractId', authenticateToken, async (req, res) => {
       currentStage: contract.current_approval_stage,
       overallStatus: contract.status
     });
-  } catch (err) {
-    console.error('Error getting approval workflow:', err);
-    res.status(500).json({ error: err.message });
+  } catch (error) {
+    console.error('Error fetching workflow:', error);
+    res.status(500).json({ error: error.message });
   }
 });
+
+// Temporary endpoint to refresh workflow for a contract
+router.post('/refresh-workflow/:contractId', authenticateToken, async (req, res) => {
+  const { contractId } = req.params;
+  
+  try {
+    // Get current contract status
+    const contractResult = await pool.query(
+      'SELECT * FROM contracts WHERE contract_id = $1',
+      [contractId]
+    );
+    
+    if (contractResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Contract not found' });
+    }
+    
+    const contract = contractResult.rows[0];
+    
+    // If risk_assessment is approved, mark contract as completed
+    const riskAssessmentResult = await pool.query(
+      'SELECT * FROM contract_approvals WHERE contract_id = $1 AND stage = $2 AND status = $3',
+      [contractId, 'risk_assessment', 'approved']
+    );
+    
+    if (riskAssessmentResult.rows.length > 0) {
+      // Update contract to completed
+      await pool.query(
+        'UPDATE contracts SET current_approval_stage = $1, status = $2 WHERE contract_id = $3',
+        ['completed', 'approved', contractId]
+      );
+    }
+    
+    res.json({ success: true, message: 'Workflow refreshed' });
+  } catch (error) {
+    console.error('Error refreshing workflow:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+module.exports = router;
 
 // Submit approval/rejection for a stage
 router.post('/contract/:contractId/stage/:stage', authenticateToken, async (req, res) => {
@@ -232,7 +271,7 @@ router.get('/pending', authenticateToken, async (req, res) => {
           WHERE stage = c.current_approval_stage AND approver_id = $2
         )
       GROUP BY c.contract_id, u_gen.full_name
-      ORDER BY c.generated_at ASC
+      ORDER BY c.generated_at DESC
     `, [userStages, req.user.user_id]);
 
     const contractsWithStageInfo = result.rows.map(contract => ({
@@ -251,6 +290,13 @@ router.get('/pending', authenticateToken, async (req, res) => {
 // Get approval statistics
 router.get('/stats', authenticateToken, async (req, res) => {
   try {
+    // Clean up any invalid stage values
+    await pool.query(`
+      UPDATE contracts 
+      SET current_approval_stage = 'document_review' 
+      WHERE current_approval_stage = 'document_review_complete'
+    `);
+
     const stats = await pool.query(`
       SELECT 
         COUNT(*) as total_contracts,
@@ -272,13 +318,19 @@ router.get('/stats', authenticateToken, async (req, res) => {
       GROUP BY current_approval_stage
     `);
 
+    // Create a complete stage breakdown showing all 4 stages
+    const stageBreakdown = STAGE_ORDER.filter(stage => stage !== 'completed').map(stage => {
+      const stageData = stageStats.rows.find(row => row.current_approval_stage === stage);
+      return {
+        stage: stage,
+        stageName: formatStageName(stage),
+        count: stageData ? parseInt(stageData.count) : 0
+      };
+    });
+
     res.json({
       overview: stats.rows[0],
-      stageBreakdown: stageStats.rows.map(row => ({
-        stage: row.current_approval_stage,
-        stageName: formatStageName(row.current_approval_stage),
-        count: parseInt(row.count)
-      }))
+      stageBreakdown: stageBreakdown
     });
   } catch (err) {
     console.error('Error getting approval stats:', err);
@@ -297,10 +349,63 @@ function formatStageName(stage) {
     [APPROVAL_STAGES.CREDIT_ANALYSIS]: 'Credit Analysis',
     [APPROVAL_STAGES.LEGAL_REVIEW]: 'Legal Review',
     [APPROVAL_STAGES.RISK_ASSESSMENT]: 'Risk Assessment',
-    [APPROVAL_STAGES.FINAL_APPROVAL]: 'Final Approval',
     [APPROVAL_STAGES.COMPLETED]: 'Completed'
   };
   return names[stage] || stage;
 }
+
+// Temporary cleanup endpoint to remove final_approval stage references
+router.post('/cleanup-final-approval', authenticateToken, async (req, res) => {
+  try {
+    // Only allow admin users to run this cleanup
+    if (req.user.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const client = await pool.connect();
+    
+    try {
+      await client.query('BEGIN');
+
+      // 1. Update contracts that are currently at final_approval stage to completed
+      const contractsResult = await client.query(`
+        UPDATE contracts 
+        SET current_approval_stage = 'completed', status = 'approved'
+        WHERE current_approval_stage = 'final_approval'
+        RETURNING contract_id, contract_number
+      `);
+
+      // 2. Delete any workflow records for final_approval stage
+      const workflowResult = await client.query(`
+        DELETE FROM contract_approvals 
+        WHERE stage = 'final_approval'
+        RETURNING contract_id, stage
+      `);
+
+      await client.query('COMMIT');
+
+      res.json({
+        success: true,
+        message: 'Final approval cleanup completed',
+        contractsUpdated: contractsResult.rowCount,
+        workflowRecordsDeleted: workflowResult.rowCount,
+        updatedContracts: contractsResult.rows
+      });
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+
+  } catch (error) {
+    console.error('Final approval cleanup error:', error);
+    res.status(500).json({ 
+      error: 'Failed to cleanup final approval references',
+      details: error.message 
+    });
+  }
+});
 
 module.exports = router;
