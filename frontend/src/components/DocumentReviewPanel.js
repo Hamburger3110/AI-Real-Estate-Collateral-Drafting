@@ -14,6 +14,7 @@ import {
 } from 'antd';
 import { SaveOutlined, WarningOutlined } from '@ant-design/icons';
 import { buildApiUrl, API_ENDPOINTS } from '../config/api';
+import { sortFieldsByOrder } from '../config/fieldOrder';
 
 const { Text, Title } = Typography;
 
@@ -26,8 +27,12 @@ const DocumentReviewPanel = ({ document, onSave, onCancel, token }) => {
   const [saving, setSaving] = useState(false);
 
   // Parse extracted data from document
+  // Legal Registration format: ocr_extracted_json.extracted_fields
+  // FPT.AI format: ocr_extracted_json.raw_response.data[0]
   const extractedData = document.ocr_extracted_json?.extracted_fields || 
+                       document.ocr_extracted_json?.raw_response?.data?.[0] ||
                        document.ocr_extracted_json?.corrected_data || 
+                       document.extracted_data ||
                        {};
   
   const confidenceScore = document.confidence_score || 0;
@@ -178,12 +183,16 @@ const DocumentReviewPanel = ({ document, onSave, onCancel, token }) => {
                 layout="vertical"
                 style={{ height: '100%' }}
               >
-                {Object.entries(extractedData).map(([key, field]) => {
+                {sortFieldsByOrder(Object.entries(extractedData), document.document_type)
+                  .map(([key, field]) => {
                   const value = typeof field === 'object' ? field.value : field;
                   const fieldConfidence = typeof field === 'object' ? field.confidence : null;
                   
                   // Show warning for low confidence fields
                   const isLowConfidence = fieldConfidence && fieldConfidence < 95;
+                  
+                  // Format field name: replace underscores with spaces, but preserve original capitalization
+                  const fieldName = key.replace(/_/g, ' ');
                   
                   return (
                     <Form.Item
@@ -191,7 +200,7 @@ const DocumentReviewPanel = ({ document, onSave, onCancel, token }) => {
                       name={key}
                       label={
                         <Space>
-                          <Text>{key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</Text>
+                          <Text>{fieldName}</Text>
                           {isLowConfidence && (
                             <WarningOutlined style={{ color: '#faad14' }} title="Low confidence field" />
                           )}

@@ -324,28 +324,117 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
       }
 
     } else if (apiType === 'BEDROCK') {
-      // Bedrock processing (Legal/Business/Financial) - Asynchronous via Lambda
-      console.log(`⏳ ${document_type} will be processed asynchronously by Lambda/Bedrock`);
-      console.log(`📁 S3 path: ${s3Key} (will trigger Lambda via SQS)`);
+      // Bedrock processing - Legal Registration uses synchronous pipeline (QR -> Google Vision -> Bedrock)
+      // Other types (Business Registration, Financial Statement) use asynchronous Lambda
+      if (document_type === 'Legal Registration') {
+        // Synchronous processing: QR detection -> Google Vision OCR -> Bedrock QA
+        console.log(`⚡ Processing ${document_type} with synchronous pipeline (QR -> Google Vision -> Bedrock)...`);
+        
+        try {
+          const processingResult = await processDocument(
+            buffer,
+            originalname,
+            document_type,
+            dbResult.document_id
+          );
 
-      // Return immediately with "Processing" status
-      // Lambda will be triggered by S3 event automatically
-      return res.status(201).json({
-        success: true,
-        message: 'File uploaded successfully. OCR processing in progress.',
-        data: {
-          document_id: dbResult.document_id,
-          file_name: originalname,
-          s3_url: s3Location,
-          s3_key: s3Key,
-          file_size: size,
-          document_type: document_type,
-          status: 'Processing',
-          processing_method: 'Lambda/Bedrock',
-          message: 'Document is being processed. You will be notified when complete.',
-          upload_timestamp: new Date().toISOString()
+          if (processingResult.success) {
+            // Fetch the complete document with ocr_extracted_json from database
+            const completeDoc = await pool.query(
+              'SELECT * FROM documents WHERE document_id = $1',
+              [dbResult.document_id]
+            );
+            
+            const docData = completeDoc.rows[0] || {};
+            console.log('📄 Complete document data:', {
+              document_id: docData.document_id,
+              status: docData.status,
+              has_ocr_extracted_json: !!docData.ocr_extracted_json,
+              ocr_keys: docData.ocr_extracted_json ? Object.keys(docData.ocr_extracted_json) : []
+            });
+            
+            // Return immediate results with extraction data
+            return res.status(201).json({
+              success: true,
+              message: 'File uploaded and extracted successfully',
+              data: {
+                document_id: dbResult.document_id,
+                file_name: originalname,
+                s3_url: s3Location,
+                s3_key: s3Key,
+                file_size: size,
+                document_type: document_type,
+                status: docData.status || 'Extracted',
+                confidence_score: docData.confidence_score || processingResult.confidenceScore,
+                needs_manual_review: docData.needs_manual_review || processingResult.needsManualReview,
+                extracted_data: processingResult.extractedData,
+                ocr_extracted_json: docData.ocr_extracted_json, // Include full OCR data for frontend
+                pipeline: processingResult.apiUsed,
+                upload_timestamp: new Date().toISOString()
+              }
+            });
+          } else {
+            // Processing failed, but upload succeeded
+            console.error(`⚠️ Legal Registration processing failed: ${processingResult.error}`);
+            return res.status(201).json({
+              success: true,
+              message: 'File uploaded but extraction failed',
+              data: {
+                document_id: dbResult.document_id,
+                file_name: originalname,
+                s3_url: s3Location,
+                s3_key: s3Key,
+                file_size: size,
+                document_type: document_type,
+                status: 'Uploaded',
+                extraction_error: processingResult.error,
+                upload_timestamp: new Date().toISOString()
+              }
+            });
+          }
+        } catch (processingError) {
+          console.error(`❌ Error during Legal Registration processing:`, processingError);
+          // Return upload success even if processing fails
+          return res.status(201).json({
+            success: true,
+            message: 'File uploaded but extraction encountered an error',
+            data: {
+              document_id: dbResult.document_id,
+              file_name: originalname,
+              s3_url: s3Location,
+              s3_key: s3Key,
+              file_size: size,
+              document_type: document_type,
+              status: 'Uploaded',
+              extraction_error: processingError.message,
+              upload_timestamp: new Date().toISOString()
+            }
+          });
         }
-      });
+      } else {
+        // Other Bedrock types (Business Registration, Financial Statement) - Asynchronous via Lambda
+        console.log(`⏳ ${document_type} will be processed asynchronously by Lambda/Bedrock`);
+        console.log(`📁 S3 path: ${s3Key} (will trigger Lambda via SQS)`);
+
+        // Return immediately with "Processing" status
+        // Lambda will be triggered by S3 event automatically
+        return res.status(201).json({
+          success: true,
+          message: 'File uploaded successfully. OCR processing in progress.',
+          data: {
+            document_id: dbResult.document_id,
+            file_name: originalname,
+            s3_url: s3Location,
+            s3_key: s3Key,
+            file_size: size,
+            document_type: document_type,
+            status: 'Processing',
+            processing_method: 'Lambda/Bedrock',
+            message: 'Document is being processed. You will be notified when complete.',
+            upload_timestamp: new Date().toISOString()
+          }
+        });
+      }
 
     } else {
       // Unknown document type - should not happen due to validation

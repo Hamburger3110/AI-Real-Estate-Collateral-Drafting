@@ -29,6 +29,7 @@ import {
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 import { buildApiUrl, API_ENDPOINTS } from '../config/api';
+import { sortFieldsByOrder } from '../config/fieldOrder';
 
 const { Dragger } = Upload;
 const { Text } = Typography;
@@ -48,6 +49,35 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
   const [editingDocument, setEditingDocument] = useState(null);
   const { user, token } = useAuth();
 
+  // Helper function to format complex values (arrays, objects) for display
+  const formatDisplayValue = (value) => {
+    if (value === null || value === undefined) return 'N/A';
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number') return String(value);
+    if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+    if (Array.isArray(value)) {
+      // Format array items nicely
+      return value.map(item => {
+        if (typeof item === 'object' && item !== null) {
+          return Object.entries(item).map(([k, v]) => `${k}: ${v}`).join(', ');
+        }
+        return String(item);
+      }).join('; ');
+    }
+    if (typeof value === 'object') {
+      // Format object as key-value pairs, more readable
+      return Object.entries(value)
+        .map(([k, v]) => {
+          if (typeof v === 'object' && v !== null && !Array.isArray(v)) {
+            return `${k}: {${Object.entries(v).map(([k2, v2]) => `${k2}: ${v2}`).join(', ')}}`;
+          }
+          return `${k}: ${v}`;
+        })
+        .join('; ');
+    }
+    return String(value);
+  };
+
   // Helper function to get extracted data from document
   const getExtractedData = (item) => {
     try {
@@ -64,13 +94,20 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
         return item.extracted_data;
       }
       
-      // Check for ocr_extracted_json format from FPT.AI
+      // Check for ocr_extracted_json format
       if (item?.ocr_extracted_json && typeof item.ocr_extracted_json === 'object') {
-        // The actual extracted fields are nested under 'data'
+        // Legal Registration pipeline format: ocr_extracted_json.extracted_fields
+        if (item.ocr_extracted_json?.extracted_fields && typeof item.ocr_extracted_json.extracted_fields === 'object' && Object.keys(item.ocr_extracted_json.extracted_fields).length > 0) {
+          console.log('✅ Found Legal Registration extracted_fields with keys:', Object.keys(item.ocr_extracted_json.extracted_fields));
+          return item.ocr_extracted_json.extracted_fields;
+        }
+        
+        // FPT.AI format: ocr_extracted_json.raw_response.data[0]
         if (item.ocr_extracted_json?.raw_response?.data?.[0] && typeof item.ocr_extracted_json.raw_response.data[0] === 'object' && Object.keys(item.ocr_extracted_json.raw_response.data).length > 0) {
-          console.log('✅ Found ocr_extracted_json.data with keys:', Object.keys(item.ocr_extracted_json.raw_response.data[0]));
+          console.log('✅ Found FPT.AI ocr_extracted_json.data with keys:', Object.keys(item.ocr_extracted_json.raw_response.data[0]));
           return item.ocr_extracted_json.raw_response.data[0];
         }
+        
         // Fallback to top level if no nested data
         if (Object.keys(item.ocr_extracted_json).length > 0) {
           console.log('⚠️ Using ocr_extracted_json top level');
@@ -290,8 +327,11 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
         
         const xhr = new XMLHttpRequest();
         
-        // Set timeout to 30 seconds
-        xhr.timeout = 30000;
+        // Set timeout based on document type
+        // Legal Registration requires QR detection + Google Vision OCR + Bedrock QA (can take 60+ seconds)
+        // Other documents are faster (30 seconds should be enough)
+        const isLegalRegistration = fileItem.type === 'Legal Registration';
+        xhr.timeout = isLegalRegistration ? 120000 : 30000; // 120 seconds for Legal Registration, 30 for others
       
       xhr.upload.addEventListener('progress', (event) => {
         if (event.lengthComputable) {
@@ -346,16 +386,29 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
             if (updatedDocResponse.ok) {
               const updatedDoc = await updatedDocResponse.json();
               console.log('🔄 Updated document data:', updatedDoc);
+              console.log('📊 OCR extracted JSON:', updatedDoc.ocr_extracted_json);
+              console.log('📊 Extracted fields:', updatedDoc.ocr_extracted_json?.extracted_fields);
               
               // Merge the updated document data with our existing data
               finalDocumentData = {
                 ...finalDocumentData,
                 ...updatedDoc,
+                // Also merge ocr_extracted_json from initial response if available
+                ocr_extracted_json: updatedDoc.ocr_extracted_json || result.ocr_extracted_json || finalDocumentData.ocr_extracted_json,
                 type: fileItem.type, // Keep the original type
                 name: fileItem.file.name // Keep the original name
               };
+              
+              // Debug: Check if getExtractedData will find the data
+              const testExtracted = getExtractedData(finalDocumentData);
+              console.log('🔍 getExtractedData result:', testExtracted);
             } else {
               console.warn('Failed to fetch updated document data:', updatedDocResponse.status);
+              // Use ocr_extracted_json from initial response if available
+              if (result.ocr_extracted_json) {
+                finalDocumentData.ocr_extracted_json = result.ocr_extracted_json;
+                console.log('📊 Using OCR data from initial response:', result.ocr_extracted_json);
+              }
             }
 
             setUploadedDocuments(prev => [...prev, finalDocumentData]);
@@ -431,7 +484,10 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
 
       xhr.ontimeout = () => {
         console.error('XMLHttpRequest timeout');
-        message.error(`Upload timeout for ${fileItem.file.name}. Please try again.`);
+        const timeoutMessage = isLegalRegistration 
+          ? `Upload timeout for ${fileItem.file.name}. Legal Registration processing can take up to 2 minutes. Please check the document status later.`
+          : `Upload timeout for ${fileItem.file.name}. Please try again.`;
+        message.error(timeoutMessage);
         setFileList(prev => prev.map(item => 
           item.uid === fileItem.uid 
             ? { ...item, status: 'error' }
@@ -891,10 +947,13 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
                   description={
                     <Space direction="vertical" style={{ width: '100%' }}>
                       <Select
-                        value={item.type}
+                        value={item.type || 'ID Card'}
                         onChange={(value) => updateDocumentType(item.uid, value)}
                         style={{ width: '100%' }}
                         placeholder="Select document type"
+                        disabled={item.status === 'uploading' || item.status === 'done'}
+                        getPopupContainer={(triggerNode) => triggerNode.parentElement || document.body}
+                        dropdownMatchSelectWidth={true}
                       >
                         {documentTypes.map(type => (
                           <Option key={type.value} value={type.value}>
@@ -1069,23 +1128,34 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
                           Edit Extracted Fields (Click field values to edit):
                         </Text>
                         <Form layout="vertical" size="small">
-                          {Object.entries(getExtractedData(item)).map(([key, value]) => {
-                            const displayValue = typeof value === 'object' ? value.value : value;
+                          {sortFieldsByOrder(Object.entries(getExtractedData(item)), item.type || item.document_type)
+                            .map(([key, value]) => {
+                            // Extract the actual value from the field object
+                            const actualValue = typeof value === 'object' && value !== null && !Array.isArray(value) && 'value' in value
+                              ? value.value 
+                              : value;
+                            // For form inputs, convert complex values to JSON string for editing
+                            const displayValue = typeof actualValue === 'object' || Array.isArray(actualValue)
+                              ? JSON.stringify(actualValue, null, 2)
+                              : (actualValue || '');
                             const fieldKey = `${item.document_id}_${key}`;
+                            
+                            // Format field name: replace underscores with spaces, but preserve original capitalization
+                            const fieldName = key.replace(/_/g, ' ');
                             
                             return (
                               <Form.Item
                                 key={fieldKey}
                                 label={
                                   <Text strong style={{ fontSize: '12px' }}>
-                                    {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                    {fieldName}
                                   </Text>
                                 }
                                 style={{ marginBottom: 8 }}
                               >
-                                {key.toLowerCase().includes('address') || (typeof displayValue === 'string' && displayValue.length > 50) ? (
+                                {key.toLowerCase().includes('address') || (typeof displayValue === 'string' && displayValue.length > 50) || typeof actualValue === 'object' || Array.isArray(actualValue) ? (
                                   <Input.TextArea
-                                    rows={2}
+                                    rows={typeof actualValue === 'object' || Array.isArray(actualValue) ? 4 : 2}
                                     defaultValue={displayValue || ''}
                                     placeholder={`Enter ${key.replace(/_/g, ' ')}`}
                                     onChange={(e) => {
@@ -1150,28 +1220,61 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
                           borderRadius: 4,
                           fontSize: '12px'
                         }}>
-                          {Object.entries(getExtractedData(item)).map(([key, value]) => {
-                            const displayValue = typeof value === 'object' ? value.value : value;
-                            const fieldKey = `${item.document_id}_${key}`;
-                            const editedValue = editableExtractedData[fieldKey];
+                          {(() => {
+                            const extractedEntries = sortFieldsByOrder(Object.entries(getExtractedData(item)), item.type || item.document_type);
+                            const isLegalRegistration = (item.type === 'Legal Registration' || item.document_type === 'Legal Registration');
                             
-                            return (
-                              <div key={key} style={{ marginBottom: 6, display: 'flex', justifyContent: 'space-between' }}>
-                                <Text type="secondary" style={{ minWidth: '120px' }}>
-                                  {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}:
-                                </Text>
-                                <Text style={{ flex: 1, textAlign: 'right' }}>
-                                  {editedValue !== undefined ? (
-                                    <span style={{ color: '#1B5E20', fontWeight: 'bold' }}>
-                          {editedValue} <Tag size="small" color="#23B44F">edited</Tag>
-                                    </span>
-                                  ) : (
-                                    displayValue || 'N/A'
-                                  )}
-                                </Text>
-                              </div>
-                            );
-                          })}
+                            // Calculate max field name length for Legal Registration to create consistent column alignment
+                            let maxFieldNameLength = 0;
+                            if (isLegalRegistration) {
+                              extractedEntries.forEach(([key]) => {
+                                const fieldName = key.replace(/_/g, ' ');
+                                maxFieldNameLength = Math.max(maxFieldNameLength, fieldName.length);
+                              });
+                              // Add padding for colon and spacing (colon + 2 spaces)
+                              maxFieldNameLength = Math.max(maxFieldNameLength * 8, 150); // 8px per character estimate, min 150px
+                            }
+                            
+                            return extractedEntries.map(([key, value]) => {
+                              // Extract the actual value from the field object
+                              const actualValue = typeof value === 'object' && value !== null && !Array.isArray(value) && 'value' in value
+                                ? value.value 
+                                : value;
+                              // Format complex values (arrays, objects) for display
+                              const displayValue = formatDisplayValue(actualValue);
+                              const fieldKey = `${item.document_id}_${key}`;
+                              const editedValue = editableExtractedData[fieldKey];
+                              
+                              // Format field name: replace underscores with spaces, but preserve original capitalization
+                              const fieldName = key.replace(/_/g, ' ');
+                              
+                              return (
+                                <div key={key} style={{ marginBottom: 6, display: 'flex', alignItems: 'flex-start' }}>
+                                  <Text type="secondary" style={{ 
+                                    width: isLegalRegistration ? `${maxFieldNameLength}px` : 'auto',
+                                    minWidth: isLegalRegistration ? `${maxFieldNameLength}px` : '120px',
+                                    flexShrink: 0
+                                  }}>
+                                    {fieldName}:
+                                  </Text>
+                                  <Text style={{ 
+                                    flex: 1, 
+                                    textAlign: isLegalRegistration ? 'left' : 'right', 
+                                    wordBreak: 'break-word',
+                                    marginLeft: isLegalRegistration ? '8px' : '0'
+                                  }}>
+                                    {editedValue !== undefined ? (
+                                      <span style={{ color: '#1B5E20', fontWeight: 'bold' }}>
+                                        {formatDisplayValue(editedValue)} <Tag size="small" color="#23B44F">edited</Tag>
+                                      </span>
+                                    ) : (
+                                      displayValue || 'N/A'
+                                    )}
+                                  </Text>
+                                </div>
+                              );
+                            });
+                          })()}
                         </div>
                       </div>
                     )}
