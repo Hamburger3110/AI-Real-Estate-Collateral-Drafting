@@ -17,7 +17,8 @@ const CONTRACT_FIELD_MAPPING = {
   'lender.name': ['Full Name', 'name', 'customer_name'],
   'lender.id.number': ['ID Number', 'id', 'identity_number'],
   'lender.id.issuer': ['ID Issuer', 'issuer', 'id_issuer'],
-  'lender.id.issue_date': ['ID Issue Date', 'issue_date', 'id_issue_date'],
+  'lender.id.issue_date': ['ID Issue Date', 'issue_date', 'id_issue_date', 'dob'],
+  'lender.id.expiry_date': ['ID Expiry Date', 'expiry_date', 'doe'],
   'lender.address.original': ['Address', 'address', 'place_of_origin', 'home'],
 
   // Spouse information (if available)
@@ -152,28 +153,80 @@ async function mapContractFields(contractId, pool) {
       
       const extractedData = doc.ocr_extracted_json;
       
-      if (!extractedData || !extractedData.data) {
+      if (!extractedData) {
         console.log(`   ⚠️ No extracted data found in ${doc.file_name}`);
         continue;
       }
       
-      // Process FPT.AI extraction format
-      const dataArray = Array.isArray(extractedData.data) ? extractedData.data : [extractedData.data];
+      // Handle different OCR extraction formats
+      let dataToProcess = [];
       
-      for (const dataItem of dataArray) {
+      if (extractedData.raw_response && extractedData.raw_response.data) {
+        // FPT.AI format with raw_response wrapper
+        const rawData = extractedData.raw_response.data;
+        dataToProcess = Array.isArray(rawData) ? rawData : [rawData];
+        console.log(`   🔍 Using FPT.AI raw_response format`);
+      } else if (extractedData.data) {
+        // Direct data wrapper
+        dataToProcess = Array.isArray(extractedData.data) ? extractedData.data : [extractedData.data];
+        console.log(`   🔍 Using direct data format`);
+      } else if (extractedData.results) {
+        // Alternative format with results wrapper
+        dataToProcess = Array.isArray(extractedData.results) ? extractedData.results : [extractedData.results];
+        console.log(`   🔍 Using results format`);
+      } else if (typeof extractedData === 'object') {
+        // Direct object format
+        dataToProcess = [extractedData];
+        console.log(`   🔍 Using direct object format`);
+      }
+      
+      console.log(`   📊 Found ${dataToProcess.length} data items to process`);
+      
+      for (const dataItem of dataToProcess) {
+        if (!dataItem || typeof dataItem !== 'object') continue;
+        
         // Map each extracted field to contract fields
         for (const [contractField, possibleExtractedFields] of Object.entries(CONTRACT_FIELD_MAPPING)) {
-          if (mappedFields[contractField]) continue; // Skip if already filled
+          if (mappedFields[contractField] && mappedFields[contractField].toString().trim() !== '') {
+            continue; // Skip if already filled with valid data
+          }
           
-          // Try to find matching extracted field
+          // Try to find matching extracted field with multiple variations
           for (const extractedFieldName of possibleExtractedFields) {
-            const value = dataItem[extractedFieldName] || 
-                         dataItem[extractedFieldName.toLowerCase()] || 
-                         dataItem[extractedFieldName.replace(/\s+/g, '_').toLowerCase()];
+            let value = null;
+            
+            // Try exact match
+            value = dataItem[extractedFieldName];
+            
+            // Try lowercase
+            if (!value) {
+              value = dataItem[extractedFieldName.toLowerCase()];
+            }
+            
+            // Try with underscores instead of spaces
+            if (!value) {
+              value = dataItem[extractedFieldName.replace(/\s+/g, '_').toLowerCase()];
+            }
+            
+            // Try with spaces replaced by underscores and capitalized
+            if (!value) {
+              value = dataItem[extractedFieldName.replace(/\s+/g, '_')];
+            }
+            
+            // Try case insensitive search through all keys
+            if (!value) {
+              const matchingKey = Object.keys(dataItem).find(key => 
+                key.toLowerCase() === extractedFieldName.toLowerCase() ||
+                key.toLowerCase().replace(/\s+/g, '_') === extractedFieldName.toLowerCase().replace(/\s+/g, '_')
+              );
+              if (matchingKey) {
+                value = dataItem[matchingKey];
+              }
+            }
             
             if (value && value !== 'N/A' && value.toString().trim() !== '') {
               mappedFields[contractField] = value.toString().trim();
-              console.log(`   ✅ Mapped ${contractField} = ${value}`);
+              console.log(`   ✅ Mapped ${contractField} = "${value}" (from field: ${extractedFieldName})`);
               break;
             }
           }
