@@ -3,7 +3,7 @@ const axios = require('axios');
 
 /**
  * Legal Registration Processor
- * Orchestrates: QR detection -> (if none) VietOCR text -> Bedrock QA to JSON.
+ * Orchestrates: QR detection -> (if none) Google Cloud Vision OCR text -> Bedrock QA to JSON.
  * This module returns a normalized result; persistence is handled by callers.
  */
 
@@ -34,7 +34,7 @@ function normalizeResult(params) {
  *
  * deps: {
  *   detectQr: (buffer) => Promise<{ found: boolean, payload?: any, meta?: any }>,
- *   extractTextWithVietOCR: (buffer, fileName) => Promise<{ text: string, meta?: any }>,
+ *   extractTextWithGoogleVision: (buffer, fileName) => Promise<{ text: string, meta?: any }>,
  *   qaWithBedrockText: (text, documentType) => Promise<{ raw: any }>,
  *   parseBedrockResult: (raw, documentType) => ({ success, confidenceScore, needsManualReview, extractedData, rawResponse })
  * }
@@ -49,7 +49,7 @@ async function processLegalRegistration(buffer, fileName, documentId, deps) {
 
   const {
     detectQr,
-    extractTextWithVietOCR,
+    extractTextWithGoogleVision,
     qaWithBedrockText,
     parseBedrockResult
   } = deps || {};
@@ -129,9 +129,9 @@ async function processLegalRegistration(buffer, fileName, documentId, deps) {
     });
   }
 
-  // Fallback: VietOCR -> Bedrock QA
-  if (typeof extractTextWithVietOCR !== 'function') {
-    throw new Error('Missing dependency: extractTextWithVietOCR');
+  // Fallback: Google Cloud Vision OCR -> Bedrock QA
+  if (typeof extractTextWithGoogleVision !== 'function') {
+    throw new Error('Missing dependency: extractTextWithGoogleVision');
   }
   if (typeof qaWithBedrockText !== 'function') {
     throw new Error('Missing dependency: qaWithBedrockText');
@@ -140,7 +140,7 @@ async function processLegalRegistration(buffer, fileName, documentId, deps) {
     throw new Error('Missing dependency: parseBedrockResult');
   }
 
-  const ocr = await extractTextWithVietOCR(buffer, safeFileName);
+  const ocr = await extractTextWithGoogleVision(buffer, safeFileName);
   const ocrText = (ocr && typeof ocr.text === 'string') ? ocr.text : '';
 
   const qaRaw = await qaWithBedrockText(ocrText, documentType);

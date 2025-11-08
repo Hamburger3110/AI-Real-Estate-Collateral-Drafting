@@ -10,7 +10,7 @@ const fptaiConfig = require('../config/fptai-config');
 const bedrockConfig = require('../config/bedrock-config');
 const { processLegalRegistration } = require('./legal-registration-processor');
 const { detect } = require('./qr-detector');
-const { extractTextWithVietOCR } = require('./viet-ocr');
+const { extractTextWithGoogleVision } = require('./google-vision-ocr');
 const { qaWithBedrockText } = require('./bedrock-qa');
 const { pool } = require('../db');
 
@@ -69,14 +69,14 @@ async function processDocument(fileBuffer, fileName, documentType, documentId) {
 
     } else if (apiType === 'BEDROCK') {
       if (documentType === 'Legal Registration') {
-        // Use local orchestration: QR -> (if URL/text) Bedrock QA OR VietOCR -> Bedrock QA
+        // Use local orchestration: QR -> (if URL/text) Bedrock QA OR Google Cloud Vision OCR -> Bedrock QA
         const orchestration = await processLegalRegistration(
           fileBuffer,
           fileName,
           documentId,
           {
             detectQr: detect,
-            extractTextWithVietOCR,
+            extractTextWithGoogleVision,
             qaWithBedrockText,
             parseBedrockResult: bedrockConfig.parseExtractionResult
           }

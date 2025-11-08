@@ -1,4 +1,6 @@
 const axios = require('axios');
+const http = require('http');
+const https = require('https');
 
 /**
  * VietOCR adapter.
@@ -27,7 +29,12 @@ async function extractTextWithVietOCR(buffer, fileName) {
       dataBase64: buffer.toString('base64')
     };
 
-    const res = await axios.post(endpoint, payload, { timeout: 60000 });
+    const res = await axios.post(endpoint, payload, { 
+      timeout: 180000, // 3 minutes - first request may download model weights
+      // Prevent socket hang up
+      httpAgent: new http.Agent({ keepAlive: true }),
+      httpsAgent: new https.Agent({ keepAlive: true })
+    });
     const text = (res && res.data && typeof res.data.text === 'string') ? res.data.text : '';
 
     return {

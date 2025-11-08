@@ -10,12 +10,30 @@ const { createTables, runMigrations, seedDemoUsers, testConnection, createDocume
 const { router: eventsRouter, sendTextractComplete } = require('./events');
 const { processDocument, getAPIForDocumentType } = require('./services/document-processor');
 
-// Configure AWS with environment variables
-AWS.config.update({ 
-  region: process.env.AWS_REGION || 'us-east-2',
-  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
-});
+// Configure AWS - support both profiles and environment variables
+if (process.env.AWS_PROFILE) {
+  // Use AWS profile from credentials file
+  const credentials = new AWS.SharedIniFileCredentials({ profile: process.env.AWS_PROFILE });
+  AWS.config.update({
+    region: process.env.AWS_REGION || 'us-east-2',
+    credentials: credentials
+  });
+  console.log(`✅ Using AWS profile: ${process.env.AWS_PROFILE}`);
+} else if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
+  // Use environment variables (backward compatibility)
+  AWS.config.update({ 
+    region: process.env.AWS_REGION || 'us-east-2',
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+  });
+  console.log(`✅ Using AWS credentials from environment variables`);
+} else {
+  // Try default AWS credential chain (includes profiles)
+  AWS.config.update({
+    region: process.env.AWS_REGION || 'us-east-2'
+  });
+  console.log(`✅ Using AWS default credential chain`);
+}
 const s3 = new AWS.S3();
 const textract = new AWS.Textract();
 
@@ -85,7 +103,7 @@ app.post('/legal-test', upload.single('file'), async (req, res) => {
     }
     const { processLegalRegistration } = require('./services/legal-registration-processor');
     const { detect } = require('./services/qr-detector');
-    const { extractTextWithVietOCR } = require('./services/viet-ocr');
+    const { extractTextWithGoogleVision } = require('./services/google-vision-ocr');
     const { qaWithBedrockText } = require('./services/bedrock-qa');
     const { parseExtractionResult } = require('./config/bedrock-config');
 
@@ -95,7 +113,7 @@ app.post('/legal-test', upload.single('file'), async (req, res) => {
       null,
       {
         detectQr: detect,
-        extractTextWithVietOCR,
+        extractTextWithGoogleVision,
         qaWithBedrockText,
         parseBedrockResult: parseExtractionResult
       }

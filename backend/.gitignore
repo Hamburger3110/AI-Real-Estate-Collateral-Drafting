@@ -1,3 +1,5 @@
 /node_modules
 
 .env
+viet-ocr-ec2.pem
+google-credentials.json
