@@ -36,7 +36,7 @@ async function processDocument(fileBuffer, fileName, documentType, documentId) {
     console.log(`\n🔄 Processing document ${documentId}: ${fileName} (${documentType})`);
     
     // Determine which API to use
-    const apiType = DOCUMENT_ROUTING[documentType];
+    let apiType = DOCUMENT_ROUTING[documentType];
     
     if (!apiType) {
       throw new Error(`Unknown document type: ${documentType}`);
@@ -66,6 +66,24 @@ async function processDocument(fileBuffer, fileName, documentType, documentId) {
         extractionResult.data, 
         documentType
       );
+
+      // Normalize FPT.AI result: convert extractedFields array to extractedData object format
+      // FPT.AI returns: extractedFields = [{ field_name, field_value, confidence_score }, ...]
+      // We need: extractedData = { "field_name": { value: "...", confidence: 0.95 }, ... }
+      if (parsedResult.success && parsedResult.extractedFields && Array.isArray(parsedResult.extractedFields)) {
+        const extractedDataObj = {};
+        parsedResult.extractedFields.forEach(field => {
+          if (field.field_name) {
+            extractedDataObj[field.field_name] = {
+              value: field.field_value || '',
+              confidence: field.confidence_score || 0
+            };
+          }
+        });
+        parsedResult.extractedData = extractedDataObj;
+      } else {
+        parsedResult.extractedData = {};
+      }
 
     } else if (apiType === 'BEDROCK') {
       if (documentType === 'Legal Registration') {

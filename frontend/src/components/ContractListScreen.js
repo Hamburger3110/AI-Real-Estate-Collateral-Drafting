@@ -500,7 +500,10 @@ function ContractListScreen() {
       setUploadProgress((prev) => ({ ...prev, [fileItem.uid]: 0 }));
 
       const xhr = new XMLHttpRequest();
-      xhr.timeout = 30000;
+      // Set timeout based on document type
+      // Legal Registration requires QR detection + Google Vision OCR + Bedrock QA (can take 60+ seconds)
+      const isLegalRegistration = fileItem.type === 'Legal Registration';
+      xhr.timeout = isLegalRegistration ? 120000 : 30000; // 120 seconds for Legal Registration, 30 for others
 
       xhr.upload.addEventListener("progress", (event) => {
         if (event.lengthComputable) {
@@ -582,7 +585,10 @@ function ContractListScreen() {
       };
 
       xhr.ontimeout = () => {
-        message.error(`Upload timeout for ${fileItem.file.name}`);
+        const timeoutMessage = isLegalRegistration 
+          ? `Upload timeout for ${fileItem.file.name}. Legal Registration processing can take up to 2 minutes. Please check the document status later.`
+          : `Upload timeout for ${fileItem.file.name}. Please try again.`;
+        message.error(timeoutMessage);
       };
 
       xhr.open("POST", buildApiUrl(API_ENDPOINTS.UPLOAD));
@@ -1655,7 +1661,7 @@ function ContractListScreen() {
                         description={
                           <Space>
                             <Select
-                              value={item.type}
+                              value={item.type || 'ID Card'}
                               onChange={(value) => {
                                 setFileList((prev) =>
                                   prev.map((f) =>
@@ -1667,6 +1673,9 @@ function ContractListScreen() {
                               }}
                               size="small"
                               style={{ width: 200 }}
+                              disabled={item.status === 'uploading' || item.status === 'done'}
+                              getPopupContainer={(triggerNode) => triggerNode.parentElement || document.body}
+                              dropdownMatchSelectWidth={true}
                             >
                               <Select.Option value="ID Card">
                                 ID Card
