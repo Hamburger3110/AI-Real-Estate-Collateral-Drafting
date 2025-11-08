@@ -39,7 +39,7 @@ function ApprovalDashboard() {
     if (!token) return;
 
     try {
-      const response = await fetch(buildApiUrl(API_ENDPOINTS.PENDING_APPROVALS), {
+      const response = await fetch(buildApiUrl(API_ENDPOINTS.APPROVALS, '/pending'), {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -65,7 +65,7 @@ function ApprovalDashboard() {
     if (!token) return;
 
     try {
-      const response = await fetch(buildApiUrl(API_ENDPOINTS.APPROVAL_STATS), {
+      const response = await fetch(buildApiUrl(API_ENDPOINTS.APPROVALS, '/stats'), {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",

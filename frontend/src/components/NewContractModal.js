@@ -605,7 +605,122 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
       }
 
       const result = await response.json();
-      message.success(`Contract created successfully! ${result.document_count} document(s) verified and attached. Approval workflow has been started.`);
+      message.success({
+        content: (
+          <div>
+            <div style={{ fontWeight: 'bold' }}>✅ Contract Validated Successfully!</div>
+            <div style={{ fontSize: '12px', marginTop: '4px' }}>
+              {result.document_count} document(s) verified and attached
+            </div>
+          </div>
+        ),
+        duration: 3
+      });
+      
+      // STEP 2: Automatically generate the contract document
+      message.info('🏗️ Generating contract document...');
+      
+      try {
+        const generateResponse = await fetch(buildApiUrl(API_ENDPOINTS.CONTRACTS, `/${contractData.contract_id}/generate`), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            // Include any user input fields from the contract form
+            userInputFields: {
+              'doc.number': contractData.contract_number,
+              'doc.signing_date': new Date().toLocaleDateString('vi-VN'),
+              'loan.amount': contractData.loan_amount?.toString()
+            }
+          })
+        });
+
+        if (generateResponse.ok) {
+          // Check if response is a file download
+          const contentType = generateResponse.headers.get('content-type');
+          if (contentType && contentType.includes('application/vnd.openxmlformats-officedocument.wordprocessingml.document')) {
+            // It's a file download - create download link
+            const blob = await generateResponse.blob();
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `contract_${contractData.contract_number}_${Date.now()}.docx`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+            
+            message.success({
+              content: (
+                <div>
+                  <div style={{ fontWeight: 'bold' }}>📄 Contract Document Generated!</div>
+                  <div style={{ fontSize: '12px', marginTop: '4px' }}>
+                    Comprehensive contract document downloaded successfully
+                  </div>
+                </div>
+              ),
+              duration: 4
+            });
+          } else {
+            // It's a JSON response
+            const generateResult = await generateResponse.json();
+            if (generateResult.success) {
+              message.success({
+                content: '🎉 Contract document generated successfully!',
+                duration: 6
+              });
+            } else {
+              throw new Error(generateResult.error || 'Contract generation failed');
+            }
+          }
+        } else {
+          const generateError = await generateResponse.json();
+          throw new Error(generateError.error || 'Contract generation failed');
+        }
+        
+      } catch (generateError) {
+        console.error('Contract generation error:', generateError);
+        message.warning({
+          content: (
+            <div>
+              <div style={{ fontWeight: 'bold' }}>⚠️ Contract Created - Generation Issue</div>
+              <div style={{ fontSize: '12px', marginTop: '4px' }}>
+                Contract created successfully but document generation failed: {generateError.message}
+                <br />
+                You can generate the document later from the contract details page.
+              </div>
+            </div>
+          ),
+          duration: 10,
+          style: {
+            marginTop: '100px'
+          }
+        });
+      }
+      
+      // STEP 3: Show completion snackbar and reset form
+      message.success({
+        content: (
+          <div>
+            <div style={{ fontWeight: 'bold', fontSize: '16px', marginBottom: '8px' }}>
+              🎉 Contract Creation Completed Successfully!
+            </div>
+            <div style={{ fontSize: '14px' }}>
+              Contract {contractData.contract_number} has been created with {result.document_count} document(s) attached.
+              <br />
+              ✅ Contract document generated and downloaded
+              <br />
+              🔄 Approval workflow has been started
+            </div>
+          </div>
+        ),
+        duration: 8,
+        style: {
+          marginTop: '100px'
+        }
+      });
       
       // Reset form state without deleting the contract (successful completion)
       setCurrentStep(0);
@@ -621,7 +736,7 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
       
       onSuccess();
     } catch (error) {
-      console.error('Contract validation error:', error);
+      console.error('Contract completion error:', error);
       message.error(`Failed to complete contract: ${error.message}`);
     } finally {
       setLoading(false);
@@ -1114,10 +1229,13 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
           type="primary" 
           onClick={handleFinish}
           disabled={uploadedDocuments.filter(doc => doc.document_id).length === 0}
+          loading={loading}
         >
-          {uploadedDocuments.filter(doc => doc.document_id).length === 0 
-            ? 'Upload Documents Required' 
-            : 'Complete Contract Creation'
+          {loading 
+            ? 'Creating & Generating Contract...' 
+            : uploadedDocuments.filter(doc => doc.document_id).length === 0 
+              ? 'Upload Documents Required' 
+              : 'Complete Contract Creation & Generate Document'
           }
         </Button>
       </Space>
@@ -1152,6 +1270,16 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
           <div style={{ textAlign: 'center', padding: '50px' }}>
             <Spin size="large" />
             <p style={{ marginTop: 16 }}>Creating contract...</p>
+          </div>
+        ) : loading && contractData ? (
+          <div style={{ textAlign: 'center', padding: '50px' }}>
+            <Spin size="large" />
+            <p style={{ marginTop: 16, fontSize: '16px', fontWeight: 'bold' }}>
+              🏗️ Completing Contract Creation
+            </p>
+            <p style={{ marginTop: 8, color: '#666' }}>
+              Validating documents, generating contract document, and starting approval workflow...
+            </p>
           </div>
         ) : (
           <>
