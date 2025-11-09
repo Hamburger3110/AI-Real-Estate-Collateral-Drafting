@@ -2,34 +2,28 @@ const AWS = require('aws-sdk');
 const axios = require('axios');
 
 const REGION = process.env.AWS_REGION || 'us-east-1';
-// Use inference profile ID instead of model ID (required for on-demand models)
-// Inference profile ID for Claude 3.5 Sonnet: us.anthropic.claude-3-5-sonnet-20240620-v1:0
-const MODEL_ID = process.env.BEDROCK_MODEL_ID || process.env.BEDROCK_INFERENCE_PROFILE_ID || 'us.anthropic.claude-3-5-sonnet-20240620-v1:0';
+// Inference profile ID for Claude 3.5 Sonnet (required for on-demand models)
+const INFERENCE_PROFILE_ID = process.env.BEDROCK_MODEL_ID || process.env.BEDROCK_INFERENCE_PROFILE_ID || 'us.anthropic.claude-3-5-sonnet-20240620-v1:0';
 const BEARER_TOKEN = process.env.AWS_BEARER_TOKEN_BEDROCK;
 
-// Initialize Bedrock client - use API key if available, otherwise fall back to AWS credentials
-let bedrockRuntime;
-if (BEARER_TOKEN) {
-  // API key authentication - will use axios directly
-  bedrockRuntime = null;
-} else {
-  // Support both AWS profiles and environment variables
+// Initialize Bedrock client for credential access (only needed for AWS signature v4)
+// We always use HTTP endpoints, not AWS SDK's invokeModel()
+let bedrockRuntime = null;
+if (!BEARER_TOKEN) {
+  // Only initialize if we need AWS credentials for signing
   if (process.env.AWS_PROFILE) {
-    // Use AWS profile from credentials file
     const credentials = new AWS.SharedIniFileCredentials({ profile: process.env.AWS_PROFILE });
     bedrockRuntime = new AWS.BedrockRuntime({
       region: REGION,
       credentials: credentials
     });
   } else if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
-    // Use environment variables (backward compatibility)
     bedrockRuntime = new AWS.BedrockRuntime({
       region: REGION,
       accessKeyId: process.env.AWS_ACCESS_KEY_ID,
       secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
     });
   } else {
-    // Use default AWS credential chain
     bedrockRuntime = new AWS.BedrockRuntime({
       region: REGION
     });
@@ -98,13 +92,11 @@ async function qaWithBedrockText(text, documentType = 'Legal Registration') {
     ]
   };
 
+  // Always use inference-profiles endpoint (Claude 3.5 uses inference profiles)
+  const endpoint = `https://bedrock-runtime.${REGION}.amazonaws.com/inference-profiles/${INFERENCE_PROFILE_ID}/invoke`;
+
   if (BEARER_TOKEN) {
-    // Use API key authentication via direct HTTP call
-    // For inference profiles, use /inference-profiles/ endpoint instead of /model/
-    const isInferenceProfile = MODEL_ID.startsWith('us.') || MODEL_ID.startsWith('global.');
-    const endpoint = isInferenceProfile 
-      ? `https://bedrock-runtime.${REGION}.amazonaws.com/inference-profiles/${MODEL_ID}/invoke`
-      : `https://bedrock-runtime.${REGION}.amazonaws.com/model/${MODEL_ID}/invoke`;
+    // Use Bearer token authentication
     const response = await axios.post(endpoint, requestBody, {
       headers: {
         'Authorization': `Bearer ${BEARER_TOKEN}`,
@@ -115,16 +107,58 @@ async function qaWithBedrockText(text, documentType = 'Legal Registration') {
     });
     return { raw: response.data };
   } else {
-    // Use AWS SDK with credentials
-    const params = {
-      modelId: MODEL_ID,
-      contentType: 'application/json',
-      accept: 'application/json',
-      body: JSON.stringify(requestBody)
+    // Use AWS credentials with signature v4 signing
+    // Get AWS credentials
+    let credentials;
+    if (process.env.AWS_PROFILE) {
+      credentials = new AWS.SharedIniFileCredentials({ profile: process.env.AWS_PROFILE });
+    } else if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
+      credentials = new AWS.Credentials({
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+      });
+    } else {
+      // Use default credential chain
+      credentials = bedrockRuntime?.config?.credentials || new AWS.EnvironmentCredentials('AWS');
+    }
+    
+    // Create a request object for signing
+    const url = require('url');
+    const endpointUrl = new URL(endpoint);
+    const bodyString = JSON.stringify(requestBody);
+    
+    const request = {
+      method: 'POST',
+      protocol: endpointUrl.protocol,
+      hostname: endpointUrl.hostname,
+      port: endpointUrl.port || 443,
+      path: endpointUrl.pathname,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Host': endpointUrl.hostname,
+        'Content-Length': Buffer.byteLength(bodyString)
+      },
+      body: bodyString
     };
-    const response = await bedrockRuntime.invokeModel(params).promise();
-    const responseBody = JSON.parse(response.body.toString());
-    return { raw: responseBody };
+    
+    // Sign the request using AWS SDK's V4 signer
+    const signer = new AWS.Signers.V4(request, 'bedrock');
+    await credentials.getPromise(); // Ensure credentials are loaded
+    signer.addAuthorization(credentials, new Date());
+    
+    // Make the request using axios with signed headers
+    const response = await axios.post(endpoint, requestBody, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': request.headers.Authorization,
+        'X-Amz-Date': request.headers['X-Amz-Date'],
+        'Host': endpointUrl.hostname
+      },
+      timeout: 60000
+    });
+    return { raw: response.data };
   }
 }
 
