@@ -35,7 +35,20 @@ const DocumentReviewPanel = ({ document, onSave, onCancel, token }) => {
                        document.extracted_data ||
                        {};
   
-  const confidenceScore = document.confidence_score || 0;
+  // Helper function to safely format confidence scores
+  const formatConfidenceScore = (score) => {
+    if (score === null || score === undefined) return '0.0';
+    const numScore = typeof score === 'number' ? score : parseFloat(score);
+    return isNaN(numScore) ? '0.0' : numScore.toFixed(1);
+  };
+  
+  // Safely convert confidence score to number
+  const confidenceScoreValue = document.confidence_score;
+  const confidenceScore = typeof confidenceScoreValue === 'number' 
+    ? confidenceScoreValue 
+    : (confidenceScoreValue !== null && confidenceScoreValue !== undefined 
+        ? parseFloat(confidenceScoreValue) || 0 
+        : 0);
   const needsReview = document.needs_manual_review;
 
   // Initialize form with extracted data
@@ -91,7 +104,7 @@ const DocumentReviewPanel = ({ document, onSave, onCancel, token }) => {
           message={
             <Space>
               <WarningOutlined />
-              <Text strong>Manual Review Required - Confidence: {confidenceScore.toFixed(1)}%</Text>
+              <Text strong>Manual Review Required - Confidence: {formatConfidenceScore(confidenceScore)}%</Text>
             </Space>
           }
           description="The confidence score is below 95%. Please review the extracted information and correct any errors."
@@ -103,7 +116,7 @@ const DocumentReviewPanel = ({ document, onSave, onCancel, token }) => {
 
       {!needsReview && (
         <Alert
-          message={`Extraction Confidence: ${confidenceScore.toFixed(1)}%`}
+          message={`Extraction Confidence: ${formatConfidenceScore(confidenceScore)}%`}
           description="The data was extracted with high confidence. You can still review and edit if needed."
           type="success"
           showIcon

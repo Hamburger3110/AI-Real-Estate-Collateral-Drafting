@@ -55,10 +55,17 @@ const useDocumentPolling = (documents, onStatusChange, interval = 5000) => {
               });
             }
 
+            // Helper function to safely format confidence scores
+            const formatConfidenceScore = (score) => {
+              if (score === null || score === undefined) return 'N/A';
+              const numScore = typeof score === 'number' ? score : parseFloat(score);
+              return isNaN(numScore) ? 'N/A' : numScore.toFixed(1);
+            };
+
             // Show browser notification
             if (Notification.permission === 'granted') {
               new Notification('Document Extraction Complete', {
-                body: `${data.file_name} has been processed. Confidence: ${data.confidence_score?.toFixed(1)}%`,
+                body: `${data.file_name} has been processed. Confidence: ${formatConfidenceScore(data.confidence_score)}%`,
                 icon: '/logo192.png',
                 tag: `doc-${doc.id}` // Prevent duplicate notifications
               });

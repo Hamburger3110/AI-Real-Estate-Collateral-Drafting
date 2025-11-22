@@ -56,6 +56,13 @@ import { buildApiUrl, API_ENDPOINTS } from "../config/api";
 const { Option } = Select;
 const { Text } = Typography;
 
+// Helper function to safely format confidence scores
+const formatConfidenceScore = (score) => {
+  if (score === null || score === undefined) return 'N/A';
+  const numScore = typeof score === 'number' ? score : parseFloat(score);
+  return isNaN(numScore) ? 'N/A' : numScore.toFixed(1);
+};
+
 function ContractListScreen() {
   const [contracts, setContracts] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -207,8 +214,8 @@ function ContractListScreen() {
         message: "Document Extraction Complete",
         description: `${
           updatedDoc.fileName
-        } has been processed. Confidence: ${updatedDoc.confidenceScore?.toFixed(
-          1
+        } has been processed. Confidence: ${formatConfidenceScore(
+          updatedDoc.confidenceScore
         )}%${reviewText}`,
         duration: 5,
       });

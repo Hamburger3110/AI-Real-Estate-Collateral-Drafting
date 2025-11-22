@@ -35,6 +35,13 @@ const { Dragger } = Upload;
 const { Text } = Typography;
 const { Option } = Select;
 
+// Helper function to safely format confidence scores
+const formatConfidenceScore = (score) => {
+  if (score === null || score === undefined) return 'N/A';
+  const numScore = typeof score === 'number' ? score : parseFloat(score);
+  return isNaN(numScore) ? 'N/A' : numScore.toFixed(1);
+};
+
 const NewContractModal = ({ visible, onCancel, onSuccess }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [contractForm] = Form.useForm();
@@ -423,12 +430,12 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
             if (result.status === 'Extracted') {
               if (result.needs_manual_review) {
                 message.warning({
-                  content: `${fileItem.file.name} uploaded and extracted (Confidence: ${result.confidence_score?.toFixed(1)}%). Manual review required.`,
+                  content: `${fileItem.file.name} uploaded and extracted (Confidence: ${formatConfidenceScore(result.confidence_score)}%). Manual review required.`,
                   duration: 5
                 });
               } else {
                 message.success({
-                  content: `${fileItem.file.name} uploaded and extracted successfully (Confidence: ${result.confidence_score?.toFixed(1)}%)!`,
+                  content: `${fileItem.file.name} uploaded and extracted successfully (Confidence: ${formatConfidenceScore(result.confidence_score)}%)!`,
                   duration: 5
                 });
               }
@@ -1088,7 +1095,7 @@ const NewContractModal = ({ visible, onCancel, onSuccess }) => {
                       const confidenceScore = getConfidenceScore(item);
                       return item.status === 'Extracted' && confidenceScore !== null && typeof confidenceScore === 'number' && (
                         <Tag color={needsManualReview(item) ? "warning" : "success"} icon={<CheckCircleOutlined />}>
-                          Confidence: {confidenceScore.toFixed(1)}%
+                          Confidence: {formatConfidenceScore(confidenceScore)}%
                         </Tag>
                       );
                     })()}
