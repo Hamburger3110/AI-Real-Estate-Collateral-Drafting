@@ -251,22 +251,55 @@ function parseExtractionResult(bedrockResponse, documentType = 'Business Registr
   try {
     console.log(`📋 Parsing Bedrock response for ${documentType}...`);
     
+    // Check for error responses first
+    if (bedrockResponse && bedrockResponse.Output && bedrockResponse.Output.__type) {
+      const errorType = bedrockResponse.Output.__type;
+      const errorMessage = bedrockResponse.Output.message || bedrockResponse.Output.Message || 'Unknown Bedrock API error';
+      console.error(`❌ [Bedrock Parser] Detected error response: ${errorType}`);
+      console.error(`   Error message: ${errorMessage}`);
+      throw new Error(`Bedrock API error: ${errorType} - ${errorMessage}`);
+    }
+    
     // Extract text content from Bedrock response
+    // Support both old format (invoke) and new format (converse)
     let extractedText = '';
     
-    if (bedrockResponse.content && Array.isArray(bedrockResponse.content)) {
+    // New format: /converse endpoint - output.message.content[0].text
+    if (bedrockResponse.output && bedrockResponse.output.message && bedrockResponse.output.message.content) {
+      const contentArray = bedrockResponse.output.message.content;
+      if (Array.isArray(contentArray) && contentArray.length > 0) {
+        // Find text content in the array
+        const textContent = contentArray.find(item => item.text) || contentArray[0];
+        if (textContent && textContent.text) {
+          extractedText = textContent.text;
+        }
+      }
+    }
+    // Old format: /invoke endpoint - content array with type/text
+    else if (bedrockResponse.content && Array.isArray(bedrockResponse.content)) {
       // Find text content in response
       const textContent = bedrockResponse.content.find(item => item.type === 'text');
       if (textContent && textContent.text) {
         extractedText = textContent.text;
       }
     }
+    // Fallback: check if response itself is a string
+    else if (typeof bedrockResponse === 'string') {
+      extractedText = bedrockResponse;
+    }
 
     // Parse JSON from extracted text
     // Try to find JSON object in the response
-    const jsonMatch = extractedText.match(/\{[\s\S]*\}/);
+    let jsonMatch = null;
+    if (extractedText) {
+      jsonMatch = extractedText.match(/\{[\s\S]*\}/);
+    }
+    
     if (!jsonMatch) {
-      throw new Error('No JSON found in Bedrock response');
+      console.error('❌ [Bedrock Parser] No JSON found in response');
+      console.error('   Response structure:', JSON.stringify(bedrockResponse, null, 2));
+      console.error('   Extracted text length:', extractedText ? extractedText.length : 0);
+      throw new Error('No JSON found in Bedrock response. The response may be an error or in an unexpected format.');
     }
 
     const extractedData = JSON.parse(jsonMatch[0]);

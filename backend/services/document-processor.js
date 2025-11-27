@@ -161,6 +161,9 @@ async function processDocument(fileBuffer, fileName, documentType, documentId) {
 
   } catch (error) {
     console.error(`❌ Error processing document ${documentId}:`, error.message);
+    if (error.stack) {
+      console.error('Stack trace:', error.stack);
+    }
     
     // Update document status to indicate error
     try {
